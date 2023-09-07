@@ -1,0 +1,8 @@
+fastapi[all]
+odoo_rpc_client
+black
+pytest
+pydantic
+ruff
+mypy
+aioredis
