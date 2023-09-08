@@ -6,10 +6,10 @@ from typing import Annotated
 from fastapi import Depends
 
 from src.data import UserStatus
+from src.infrastructure import OrdercastApi, get_ordercast_api
 from .helpers import is_empty, is_not_empty
 from .odoo_provider import OdooProvider, get_odoo_provider
 from .odoo_repo import OdooRepo, get_odoo_repo
-from .ordercast import OrdercastApi, get_ordercast_api
 from .validators import validate_partners
 
 

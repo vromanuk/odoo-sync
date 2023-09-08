@@ -1,8 +1,8 @@
 from logging import getLogger
 
+from src.infrastructure import OrdercastApi
 from .helpers import is_empty, is_unique_by, is_length_not_in_range
 from .odoo_repo import OdooRepo
-from .ordercast import OrdercastApi
 
 logger = getLogger(__name__)
 
