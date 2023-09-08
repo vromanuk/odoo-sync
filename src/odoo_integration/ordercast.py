@@ -16,7 +16,7 @@ class OrdercastApi:
     def save_users(self, users):
         pass
 
-    def get_partner_by_email(self, email):
+    def get_merchant(self, email):
         pass
 
     def upsert_user(self, email, defaults):

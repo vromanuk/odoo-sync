@@ -1,11 +1,10 @@
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
 
 from src.infrastructure import OdooClient, get_odoo_client
-from .enums import PartnerType, PartnerAddressType
-from .models import Partner
+from src.data.enums import PartnerType, PartnerAddressType
+from src.odoo_integration.partner import Partner
 
 
 class OdooProvider:

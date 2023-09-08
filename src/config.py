@@ -8,6 +8,7 @@ class AppConfig(BaseSettings):
     API_PREFIX: str = "/api/v1"
     PORT: int = 8000
     HOST: str = "localhost"
+    SCHEMA_PREFIX: str = "odoo-sync"
 
 
 class OdooConfig(BaseSettings):
@@ -27,7 +28,6 @@ class OrdercastConfig(BaseSettings):
 class RedisConfig(BaseSettings):
     HOST: str = "localhost"
     PORT: int = 6379
-    PREFIX: str = "odoo-sync"
 
 
 class Settings(BaseSettings):

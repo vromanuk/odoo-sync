@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from .enums import UserStatus
+from src.data import UserStatus
 from .helpers import is_empty, is_not_empty
 from .odoo_provider import OdooProvider, get_odoo_provider
 from .odoo_repo import OdooRepo, get_odoo_repo
@@ -65,22 +65,22 @@ class OdooSyncManager:
             # if 'email' in partner and partner['email']:
             if partner.email:
                 # external_user = UserExternal.all_objects.filter(odoo_id=partner["id"]).first()
-                odoo_user = self.repo.get_partner(partner.id)
+                odoo_user = self.repo.get_user(partner.id)
                 if not odoo_user:
                     email = partner["email"]
                     # exists_by_email = User.all_objects.filter(email=email).first()
-                    ordercast_partner = self.ordercast_api.get_partner_by_email(email)
+                    ordercast_partner = self.ordercast_api.get_merchant(email)
                     if ordercast_partner:
                         self.logger.warning(
                             f"User with email {email} already exists, ignoring."
                         )
                         # existing_external_object = UserExternal.all_objects.filter(user_id=exists_by_email.id).first()
-                        existing_odoo_user = self.repo.get_partner(ordercast_partner.id)
+                        existing_odoo_user = self.repo.get_user(ordercast_partner.id)
                         if existing_odoo_user:
                             self.logger.warning(
                                 f"This user already mapped to Odoo id: {existing_odoo_user.odoo_id}, but this user come with id: {partner['id']}."
                             )
-                            self.repo.update_partner(is_removed=False)
+                            self.repo.remove_user(existing_odoo_user.odoo_id)
                             # existing_external_object.is_removed = False
                             # existing_external_object.save()
                         else:
