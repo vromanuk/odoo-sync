@@ -7,7 +7,7 @@ from src.data.enums import PartnerType, PartnerAddressType
 from src.odoo_integration.partner import Partner
 
 
-class OdooProvider:
+class OdooManager:
     def __init__(self, client: OdooClient):
         self._client = client
 
@@ -91,5 +91,5 @@ class OdooProvider:
 # @lru_cache()
 def get_odoo_provider(
     odoo_client: Annotated[OdooClient, Depends(get_odoo_client)]
-) -> OdooProvider:
-    return OdooProvider(odoo_client)
+) -> OdooManager:
+    return OdooManager(odoo_client)

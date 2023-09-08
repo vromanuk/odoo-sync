@@ -6,3 +6,4 @@ pydantic
 ruff
 mypy
 redis[hiredis]
+requests

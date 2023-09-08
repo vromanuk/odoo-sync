@@ -1,13 +1,15 @@
 from logging import getLogger
 
-from src.infrastructure import OrdercastApi
 from .helpers import is_empty, is_unique_by, is_length_not_in_range
 from .odoo_repo import OdooRepo
+from .ordercast_manager import OrdercastManager
 
 logger = getLogger(__name__)
 
 
-def validate_partners(users, odoo_repo: OdooRepo, ordercast_api: OrdercastApi) -> list:
+def validate_partners(
+    users, odoo_repo: OdooRepo, ordercast_manager: OrdercastManager
+) -> list:
     if not users:
         return []
     unique_names = set()
@@ -40,7 +42,7 @@ def validate_partners(users, odoo_repo: OdooRepo, ordercast_api: OrdercastApi) -
             has_error = True
 
         # exists_by_email = User.all_objects.filter(email=user["email"]).first()
-        ordercast_user = ordercast_api.get_user_by_email(user["email"])
+        ordercast_user = ordercast_manager.get_user_by_email(user["email"])
         if ordercast_user:
             # existing_external_object = UserExternal.all_objects.filter(
             #     user_id=exists_by_email.id

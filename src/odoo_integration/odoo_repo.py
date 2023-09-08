@@ -3,7 +3,7 @@ from typing import Optional, Annotated
 from fastapi import Depends
 
 from src.config import Settings, get_settings
-from src.data.models import OdooUser
+from src.data.models import OdooUser, OdooAddress
 from src.infrastructure import RedisClient, get_redis_client
 
 
@@ -15,7 +15,13 @@ class KeySchema:
         return f"{self.prefix}:odoo:users"
 
     def odoo_user(self, odoo_user_id: int) -> str:
-        return f"{self.prefix}:odoo:users:{odoo_user_id}"
+        return f"{self.odoo_users()}:{odoo_user_id}"
+
+    def odoo_addresses(self):
+        return f"{self.prefix}:odoo:addresses"
+
+    def odoo_address(self, odoo_id):
+        return f"{self.odoo_addresses()}:{odoo_id}"
 
 
 class OdooRepo:
@@ -43,6 +49,13 @@ class OdooRepo:
 
     def remove_user(self, user_id: int) -> None:
         self._client.remove(self._schema.odoo_user(user_id))
+
+    def save_address(self, address: OdooAddress):
+        self._client.insert(
+            address,
+            self._schema.odoo_addresses(),
+            self._schema.odoo_address(address.odoo_id),
+        )
 
 
 # @lru_cache()
