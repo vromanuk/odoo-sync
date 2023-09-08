@@ -1,7 +1,10 @@
+import json
 from datetime import datetime
+from typing import Union, Optional, Self
 
 from pydantic import BaseModel, PositiveInt
 
+from src.infrastructure import OdooClient
 from .enums import CategoryType, OrderStatus, InvoiceStatus
 from .helpers import is_not_empty
 
@@ -53,8 +56,12 @@ class OdooUser(BaseModel):
     odoo_id: PositiveInt
     created_at: datetime
     updated_at: datetime
-    sync_date: datetime
+    sync_date: Optional[datetime] = None
     user: PositiveInt
+
+    @classmethod
+    def from_json(cls, user_json: str) -> Self:
+        return cls(**json.loads(user_json))
 
 
 class OdooDeliveryOption(BaseModel):
@@ -92,7 +99,7 @@ class OdooBasketProduct(BaseModel):
 
 class Partner:
     @classmethod
-    def build_from(cls, odoo_client, partner, remote_supported_langs=None):
+    def build_from(cls, odoo_client: OdooClient, partner, remote_supported_langs=None):
         partner_dto = {"id": partner["id"], "_remote_id": partner["id"]}
         if is_not_empty(partner, "street"):
             partner_dto["address_one"] = partner["street"]
@@ -136,3 +143,17 @@ class Partner:
         if is_not_empty(partner, "commercial_company_name"):
             partner_dto["company_name"] = partner["commercial_company_name"]
         return partner_dto
+
+
+OdooEntity = Union[
+    OdooProductGroup
+    | OdooCategory
+    | OdooProduct
+    | OdooAttribute
+    | OdooOrder
+    | OdooUser
+    | OdooDeliveryOption
+    | OdooWarehouse
+    | OdooAddress
+    | OdooBasketProduct
+]

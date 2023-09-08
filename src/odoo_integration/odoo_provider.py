@@ -1,6 +1,11 @@
-from src.infrastructure import OdooClient
-from .models import Partner
+from functools import lru_cache
+from typing import Annotated
+
+from fastapi import Depends
+
+from src.infrastructure import OdooClient, get_odoo_client
 from .enums import PartnerType, PartnerAddressType
+from .models import Partner
 
 
 class OdooProvider:
@@ -82,3 +87,10 @@ class OdooProvider:
             )
             for partner in partners
         ]
+
+
+# @lru_cache()
+def get_odoo_provider(
+    odoo_client: Annotated[OdooClient, Depends(get_odoo_client)]
+) -> OdooProvider:
+    return OdooProvider(odoo_client)

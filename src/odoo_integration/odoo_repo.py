@@ -1,51 +1,82 @@
-from functools import lru_cache
-from typing import Optional
+from typing import Optional, Annotated
 
-import aioredis
+import redis
 from fastapi import Depends
 
-from src.config import RedisConfig, get_settings
-from .models import OdooUser
+from src.config import RedisConfig, get_settings, Settings
+from .models import OdooUser, OdooEntity
+
+
+class KeySchema:
+    def __init__(self, prefix: str):
+        self.prefix = prefix
+
+    def odoo_users(self) -> str:
+        return f"{self.prefix}:odoo:users"
+
+    def odoo_user(self, odoo_user_id: int) -> str:
+        return f"{self.prefix}:odoo:users:{odoo_user_id}"
 
 
 class OdooRepo:
     def __init__(self, config: RedisConfig):
         self._config = config
-        self._client = aioredis.from_url(config.URL)
+        self._schema = KeySchema(config.PREFIX)
+        self._client = redis.Redis(
+            host=config.HOST, port=config.PORT, db=0, decode_responses=True
+        )
 
-    async def _insert(self, entity, entities_key: str, entity_key: str):
-        # TODO: think of introducing pipeline somewhere above
-        await self._client.hset(entity_key, mapping=entity.to_dict())
-        await self._client.sadd(entities_key, entity.id)
+    def _insert(
+        self, entity: OdooEntity, entities_key: str, entity_key: str, pipeline=None
+    ):
+        is_single_insert = False
+        if not pipeline:
+            is_single_insert = True
+            pipeline = self._client.pipeline()
 
-    async def _insert_many(self, entities, entities_key: str, entity_key: str) -> None:
+        pipeline.set(entity_key, value=entity.json())
+        pipeline.sadd(entities_key, entity.odoo_id)
+
+        if is_single_insert:
+            pipeline.execute()
+
+    def _insert_many(self, entities: list[OdooEntity], key: str) -> None:
+        pipeline = self._client.pipeline()
         for entity in entities:
-            await self._insert(entity, entities_key, entity_key)
+            self._insert(
+                entity=entity,
+                entities_key=key,
+                entity_key=f"{key}:{entity.odoo_id}",
+                pipeline=pipeline,
+            )
+        pipeline.execute()
 
-    async def get_users(self) -> list[OdooUser]:
-        # TODO: test and replace strings with key_schema
-        user_ids = await self._client.sscan_iter("odoo_users")
+    def get_users(self) -> list[OdooUser]:
+        user_ids = self._client.sscan_iter(self._schema.odoo_users())
+
         pipeline = self._client.pipeline()
         for user_id in user_ids:
-            pipeline.hgetall(f"odoo_user:{user_id}")
+            pipeline.get(self._schema.odoo_user(user_id))
 
-        users = pipeline.execute()
-        return [OdooUser(**user) for user in users]
+        users_json = pipeline.execute()
+        return [OdooUser.from_json(user_json) for user_json in users_json]
 
-    async def get_user(self, user_id: int) -> Optional[OdooUser]:
-        user = await self._client.hgetall(f"odoo_user:{user_id}")
-        return (
-            OdooUser(**{key.decode(): value.decode() for key, value in user.items()})
-            if user
-            else None
+    def get_user(self, user_id: int) -> Optional[OdooUser]:
+        user_json = self._client.get(self._schema.odoo_user(user_id))
+        return OdooUser.from_json(user_json) if user_json else None
+
+    def save_users(self, partners: list[OdooUser]) -> None:
+        self._insert_many(partners, key=self._schema.odoo_users())
+
+    def upsert_user(self, user_id, odoo_id):
+        pass
+
+    def save_user(self, user: OdooUser) -> None:
+        self._insert(
+            user, self._schema.odoo_users(), self._schema.odoo_user(user.odoo_id)
         )
 
-    async def save_users(self, partners) -> None:
-        await self._insert_many(
-            partners, entities_key="odoo_users", entity_key="odoo_user"
-        )
 
-
-@lru_cache()
-def get_odoo_repo(settings: Depends(get_settings)) -> OdooRepo:
+# @lru_cache()
+def get_odoo_repo(settings: Annotated[Settings, Depends(get_settings)]) -> OdooRepo:
     return OdooRepo(settings.REDIS)

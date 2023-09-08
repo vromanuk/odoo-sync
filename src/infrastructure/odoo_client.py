@@ -1,6 +1,10 @@
+from functools import lru_cache
+from typing import Annotated
+
+from fastapi import Depends
 from odoo_rpc_client import Client
 
-from src.config import OdooConfig
+from src.config import OdooConfig, get_settings, Settings
 
 
 class OdooClient:
@@ -12,7 +16,7 @@ class OdooClient:
             user=self._config.ODOO_USER,
             pwd=self._config.ODOO_PASSWORD,
             port=self._config.ODOO_PORT,
-            protocol=self._config.PROTOCOL,
+            protocol=self._config.ODOO_PROTOCOL,
         )
 
     def get_objects(self, object_name, criteria=None, i18n_fields=None):
@@ -77,3 +81,8 @@ class OdooClient:
 
     def get_discounts(self) -> str:
         return self._config.ODOO_DISCOUNTS
+
+
+# @lru_cache()
+def get_odoo_client(settings: Annotated[Settings, Depends(get_settings)]) -> OdooClient:
+    return OdooClient(settings.ODOO)

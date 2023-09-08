@@ -1,4 +1,3 @@
-from src.infrastructure.odoo_client import OdooClient
-from src.infrastructure.redis_client import RedisClient
+from src.infrastructure.odoo_client import OdooClient, get_odoo_client
 
-__all__ = ("OdooClient", "RedisClient")
+__all__ = ("OdooClient", "get_odoo_client")

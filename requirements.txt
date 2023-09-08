@@ -4,8 +4,6 @@
 #
 #    pip-compile
 #
-aioredis==2.0.1
-    # via -r requirements.in
 annotated-types==0.5.0
     # via pydantic
 anyio==3.7.1
@@ -14,8 +12,6 @@ anyio==3.7.1
     #   httpcore
     #   starlette
     #   watchfiles
-async-timeout==4.0.3
-    # via aioredis
 black==23.7.0
     # via -r requirements.in
 certifi==2023.7.22
@@ -41,6 +37,8 @@ h11==0.14.0
     # via
     #   httpcore
     #   uvicorn
+hiredis==2.2.3
+    # via redis
 httpcore==0.17.3
     # via httpx
 httptools==0.6.0
@@ -105,6 +103,8 @@ pyyaml==6.0.1
     # via
     #   fastapi
     #   uvicorn
+redis[hiredis]==5.0.0
+    # via -r requirements.in
 requests==2.31.0
     # via odoo-rpc-client
 ruff==0.0.287
@@ -124,7 +124,6 @@ starlette==0.27.0
     # via fastapi
 typing-extensions==4.7.1
     # via
-    #   aioredis
     #   fastapi
     #   mypy
     #   pydantic

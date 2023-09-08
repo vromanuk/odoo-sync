@@ -25,16 +25,18 @@ class OrdercastConfig(BaseSettings):
 
 
 class RedisConfig(BaseSettings):
-    URL: str
+    HOST: str = "localhost"
+    PORT: int = 6379
+    PREFIX: str = "odoo-sync"
 
 
 class Settings(BaseSettings):
     APP: AppConfig
     ODOO: OdooConfig
-    REDIS: RedisConfig
     ORDERCAST: OrdercastConfig
+    REDIS: RedisConfig
 
 
-@lru_cache()
+# @lru_cache()
 def get_settings() -> Settings:
     return Settings()

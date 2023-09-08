@@ -7,9 +7,7 @@ from .ordercast import OrdercastApi
 logger = getLogger(__name__)
 
 
-async def validate_partners(
-    users, odoo_repo: OdooRepo, ordercast_api: OrdercastApi
-) -> list:
+def validate_partners(users, odoo_repo: OdooRepo, ordercast_api: OrdercastApi) -> list:
     if not users:
         return []
     unique_names = set()
@@ -42,12 +40,12 @@ async def validate_partners(
             has_error = True
 
         # exists_by_email = User.all_objects.filter(email=user["email"]).first()
-        ordercast_user = await ordercast_api.get_user_by_email(user["email"])
+        ordercast_user = ordercast_api.get_user_by_email(user["email"])
         if ordercast_user:
             # existing_external_object = UserExternal.all_objects.filter(
             #     user_id=exists_by_email.id
             # ).first()
-            odoo_user = await odoo_repo.get_user(ordercast_user.id)
+            odoo_user = odoo_repo.get_user(ordercast_user.id)
             if odoo_user and odoo_user.odoo_id != user["id"]:
                 logger.error(
                     f"Received user with email '{user['email']}' already exists locally and it's Odoo id is '{odoo_user.odoo_id}' and name is '{ordercast_user.name}' coming Odoo id is '{user['id']}' and name is '{user['name']}'. Please give the another email to this '{user['name']}' partner in Odoo (check partners which has no children or archived)."
