@@ -1,6 +1,6 @@
-from logging import getLogger
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends
 
 from src.api import Response
@@ -10,7 +10,7 @@ router = APIRouter(
     prefix="/sync",
 )
 
-logger = getLogger(__name__)
+logger = structlog.getLogger(__name__)
 
 
 @router.get(

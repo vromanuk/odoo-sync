@@ -7,6 +7,7 @@ class AppConfig(BaseSettings):
     PORT: int = 8000
     HOST: str = "localhost"
     SCHEMA_PREFIX: str = "odoo-sync"
+    ENV: str = "dev"
 
 
 class OdooConfig(BaseSettings):

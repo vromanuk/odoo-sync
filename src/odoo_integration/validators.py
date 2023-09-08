@@ -1,10 +1,10 @@
-from logging import getLogger
+import structlog
 
 from .helpers import is_empty, is_unique_by, is_length_not_in_range
 from .odoo_repo import OdooRepo
 from .ordercast_manager import OrdercastManager
 
-logger = getLogger(__name__)
+logger = structlog.getLogger(__name__)
 
 
 def validate_partners(

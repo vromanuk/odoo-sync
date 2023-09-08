@@ -1,9 +1,9 @@
 import secrets
 from datetime import datetime, timezone
 from functools import lru_cache
-from logging import getLogger
 from typing import Annotated
 
+import structlog
 from fastapi import Depends
 
 from src.data import UserStatus, OdooUser, OdooAddress
@@ -13,7 +13,7 @@ from .odoo_repo import OdooRepo, get_odoo_repo
 from .ordercast_manager import OrdercastManager, get_ordercast_manager
 from .validators import validate_partners
 
-logger = getLogger(__name__)
+logger = structlog.getLogger(__name__)
 
 
 class OdooSyncManager:
