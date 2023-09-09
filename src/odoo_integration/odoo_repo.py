@@ -61,6 +61,9 @@ class OdooRepo:
         address_json = self._client.get(self._schema.odoo_address(address_id))
         return OdooAddress.from_json(address_json) if address_json else None
 
+    def remove_address(self, address_id: int):
+        self._client.remove(self._schema.odoo_address(address_id))
+
 
 # @lru_cache()
 def get_odoo_repo(

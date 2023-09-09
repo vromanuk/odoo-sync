@@ -259,7 +259,7 @@ class OdooSyncManager:
             users = self.ordercast_manager.get_users(odoo_repo=self.repo)
             logger.info(f"Loaded users => {len(users)}, started sending them to Odoo.")
             if users:
-                self.send_providerab.asd(users)
+                self.odoo_manager.sync_users(users)
 
 
 @lru_cache()
