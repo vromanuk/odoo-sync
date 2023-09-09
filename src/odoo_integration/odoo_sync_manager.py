@@ -93,8 +93,6 @@ class OdooSyncManager:
                             self.repo.save_user(
                                 OdooUser(
                                     odoo_id=partner["id"],
-                                    created_at=datetime.now(timezone.utc),
-                                    updated_at=datetime.now(timezone.utc),
                                     sync_date=datetime.now(timezone.utc),
                                     user=ordercast_partner.id,
                                 )
@@ -121,8 +119,6 @@ class OdooSyncManager:
                         self.repo.save_user(
                             OdooUser(
                                 odoo_id=partner["id"],
-                                created_at=datetime.now(timezone.utc),
-                                updated_at=datetime.now(timezone.utc),
                                 sync_date=datetime.now(timezone.utc),
                                 user=saved.id,
                             )
@@ -244,8 +240,6 @@ class OdooSyncManager:
             self.repo.save_address(
                 OdooAddress(
                     odoo_id=address["id"],
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
                     sync_date=datetime.now(timezone.utc),
                     address=address.id,
                     original_address_id=address.id,

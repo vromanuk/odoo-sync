@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Annotated
 
 import structlog
@@ -9,6 +10,7 @@ from src.data.enums import PartnerType, PartnerAddressType
 from .helpers import is_empty, is_not_empty
 from .odoo_repo import OdooRepo, get_odoo_repo
 from .partner import Partner
+from ..data import OdooUser, OdooAddress
 
 logger = structlog.getLogger(__name__)
 
@@ -169,8 +171,15 @@ class OdooManager:
                 copy_user["_remote_id"] = remote_id
                 user["_remote_id"] = remote_id
 
-            UserExternal.all_objects.update_or_create(
-                user_id=user["id"], defaults={"odoo_id": remote_id, "is_removed": False}
+            # UserExternal.all_objects.update_or_create(
+            #     user_id=user["id"], defaults={"odoo_id": remote_id, "is_removed": False}
+            # )
+            self._repo.save_user(
+                OdooUser(
+                    odoo_id=remote_id,
+                    sync_date=datetime.now(timezone.utc),
+                    user=user["id"],
+                )
             )
 
             if billing_addresses:
@@ -196,9 +205,10 @@ class OdooManager:
 
         # sync deleted local addresses with remote partners
         logger.info(f"Deleting unused addresses.")
-        external_addresses_for_delete = AddressExternal.all_objects.filter(
-            address_id__isnull=True, original_address_id__isnull=False
-        )
+        # external_addresses_for_delete = AddressExternal.all_objects.filter(
+        #     address_id__isnull=True, original_address_id__isnull=False
+        # )
+        external_addresses_for_delete = []
         if external_addresses_for_delete and external_addresses_for_delete.count() > 0:
             delete_remote_ids = [
                 o
@@ -318,8 +328,16 @@ class OdooManager:
 
         partner["_remote_id"] = remote_id
         send_partner["id"] = remote_id
-        AddressExternal.objects.update_or_create(
-            address_id=partner["id"], odoo_id=remote_id, defaults={"is_removed": False}
+        # AddressExternal.objects.update_or_create(
+        #     address_id=partner["id"], odoo_id=remote_id, defaults={"is_removed": False}
+        # )
+        self._repo.save_address(
+            OdooAddress(
+                odoo_id=remote_id,
+                sync_date=datetime.now(timezone.utc),
+                address=partner["id"],
+                original_address_id=partner["id"],
+            )
         )
         return send_partner
 

@@ -1,60 +1,43 @@
 import json
-from datetime import datetime
-from typing import Optional, Self
+from datetime import datetime, timezone
+from typing import Self
 
 from pydantic import BaseModel, PositiveInt
 
 from .enums import CategoryType, OrderStatus, InvoiceStatus
 
 
-class OdooProductGroup(BaseModel):
+class OdooCommons(BaseModel):
     odoo_id: PositiveInt
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = datetime.now(timezone.utc)
+    updated_at: datetime = datetime.now(timezone.utc)
     sync_date: datetime
+
+
+class OdooProductGroup(OdooCommons):
     product_group: PositiveInt
 
 
-class OdooCategory(BaseModel):
-    odoo_id: PositiveInt
-    created_at: datetime
-    updated_at: datetime
-    sync_date: datetime
+class OdooCategory(OdooCommons):
     category: PositiveInt
     category_type: CategoryType
 
 
-class OdooProduct(BaseModel):
-    odoo_id: PositiveInt
-    created_at: datetime
-    updated_at: datetime
-    sync_date: datetime
+class OdooProduct(OdooCommons):
     product: PositiveInt
 
 
-class OdooAttribute(BaseModel):
-    odoo_id: PositiveInt
-    created_at: datetime
-    updated_at: datetime
-    sync_date: datetime
+class OdooAttribute(OdooCommons):
     attribute: PositiveInt
 
 
-class OdooOrder(BaseModel):
-    odoo_id: PositiveInt
-    created_at: datetime
-    updated_at: datetime
-    sync_date: datetime
+class OdooOrder(OdooCommons):
     order: PositiveInt
     odoo_order_status: OrderStatus
     odoo_invoice_status: InvoiceStatus
 
 
-class OdooUser(BaseModel):
-    odoo_id: PositiveInt
-    created_at: datetime
-    updated_at: datetime
-    sync_date: Optional[datetime] = None
+class OdooUser(OdooCommons):
     user: PositiveInt
 
     @classmethod
@@ -62,27 +45,15 @@ class OdooUser(BaseModel):
         return cls(**json.loads(user_json))
 
 
-class OdooDeliveryOption(BaseModel):
-    odoo_id: PositiveInt
-    created_at: datetime
-    updated_at: datetime
-    sync_date: datetime
+class OdooDeliveryOption(OdooCommons):
     delivery_option: PositiveInt
 
 
-class OdooWarehouse(BaseModel):
-    odoo_id: PositiveInt
-    created_at: datetime
-    updated_at: datetime
-    sync_date: datetime
+class OdooWarehouse(OdooCommons):
     warehouse: PositiveInt
 
 
-class OdooAddress(BaseModel):
-    odoo_id: PositiveInt
-    created_at: datetime
-    updated_at: datetime
-    sync_date: datetime
+class OdooAddress(OdooCommons):
     address: PositiveInt
     original_address_id: PositiveInt
 
@@ -91,9 +62,5 @@ class OdooAddress(BaseModel):
         return cls(**json.loads(user_json))
 
 
-class OdooBasketProduct(BaseModel):
-    odoo_id: PositiveInt
-    created_at: datetime
-    updated_at: datetime
-    sync_date: datetime
+class OdooBasketProduct(OdooCommons):
     basket_product: PositiveInt
