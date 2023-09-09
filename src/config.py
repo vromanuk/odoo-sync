@@ -22,6 +22,7 @@ class OdooConfig(BaseSettings):
 
 class OrdercastConfig(BaseSettings):
     BASE_URL: str
+    TOKEN: str
 
 
 class RedisConfig(BaseSettings):
