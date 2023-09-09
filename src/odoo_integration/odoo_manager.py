@@ -5,12 +5,12 @@ import structlog
 from fastapi import Depends
 from odoo_rpc_client.connection.jsonrpc import JSONRPCError
 
-from src.infrastructure import OdooClient, get_odoo_client
+from src.data import OdooUser, OdooAddress
 from src.data.enums import PartnerType, PartnerAddressType
+from src.infrastructure import OdooClient, get_odoo_client
 from .helpers import is_empty, is_not_empty
 from .odoo_repo import OdooRepo, get_odoo_repo
 from .partner import Partner
-from ..data import OdooUser, OdooAddress
 
 logger = structlog.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class OdooManager:
             return result
 
     def receive_partners(
-        self, exclude_user_ids=None, parent_ids=None, partner_type=None
+            self, exclude_user_ids=None, parent_ids=None, partner_type=None
     ):
         api_filter_criteria = [
             ("is_company", "=", False),
@@ -185,9 +185,9 @@ class OdooManager:
             if billing_addresses:
                 for billing_address in billing_addresses:
                     if remote_id and (
-                        is_empty(billing_address, "_remote_id")
-                        or is_not_empty(billing_address, "_remote_id")
-                        and billing_address["_remote_id"] != remote_id
+                            is_empty(billing_address, "_remote_id")
+                            or is_not_empty(billing_address, "_remote_id")
+                            and billing_address["_remote_id"] != remote_id
                     ):
                         billing_address["parent_id"] = remote_id
                     billing_address["type"] = PartnerAddressType.INVOICE.value
@@ -195,9 +195,9 @@ class OdooManager:
             if shipping_addresses:
                 for shipping_address in shipping_addresses:
                     if remote_id and (
-                        is_not_empty(shipping_address, "_remote_id")
-                        or is_not_empty(shipping_address, "_remote_id")
-                        and shipping_address["_remote_id"] != remote_id
+                            is_not_empty(shipping_address, "_remote_id")
+                            or is_not_empty(shipping_address, "_remote_id")
+                            and shipping_address["_remote_id"] != remote_id
                     ):
                         shipping_address["parent_id"] = remote_id
                     shipping_address["type"] = PartnerAddressType.DELIVERY.value
@@ -279,7 +279,7 @@ class OdooManager:
             language_iso = partner["language"]
             for lang in remote_supported_langs:
                 if lang["iso_code"] == language_iso or (
-                    "_" in lang["iso_code"] and lang["iso_code"][:2] == language_iso
+                        "_" in lang["iso_code"] and lang["iso_code"][:2] == language_iso
                 ):
                     send_partner["lang"] = lang["code"]
                     break
@@ -309,8 +309,8 @@ class OdooManager:
             )
             if existing_remote_partners and len(existing_remote_partners) > 0:
                 if (
-                    is_not_empty(send_partner, "parent_id")
-                    and remote_id == send_partner["parent_id"]
+                        is_not_empty(send_partner, "parent_id")
+                        and remote_id == send_partner["parent_id"]
                 ):
                     del send_partner["parent_id"]
                 remote_partner_obj.write(remote_id, send_partner)
@@ -344,7 +344,7 @@ class OdooManager:
 
 # @lru_cache()
 def get_odoo_provider(
-    odoo_client: Annotated[OdooClient, Depends(get_odoo_client)],
-    odoo_repo: Annotated[OdooRepo, Depends(get_odoo_repo)],
+        odoo_client: Annotated[OdooClient, Depends(get_odoo_client)],
+        odoo_repo: Annotated[OdooRepo, Depends(get_odoo_repo)],
 ) -> OdooManager:
     return OdooManager(odoo_client, odoo_repo)
