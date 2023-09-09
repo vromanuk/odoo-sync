@@ -57,6 +57,10 @@ class OdooRepo:
             self._schema.odoo_address(address.odoo_id),
         )
 
+    def get_address(self, address_id: int) -> Optional[OdooAddress]:
+        address_json = self._client.get(self._schema.odoo_address(address_id))
+        return OdooAddress.from_json(address_json) if address_json else None
+
 
 # @lru_cache()
 def get_odoo_repo(

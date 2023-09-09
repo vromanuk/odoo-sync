@@ -1,4 +1,13 @@
-from .bulk_sign_up_by_erp_id import BulkSignUpByErpIdRequest
-from .create_shipping_address import CreateShippingAddressRequest
+from .ordercast_api_requests import (
+    BulkSignUpByErpIdRequest,
+    CreateShippingAddressRequest,
+    ListBillingAddressesRequest,
+    ListShippingAddressesRequest,
+)
 
-__all__ = ("CreateShippingAddressRequest", "BulkSignUpByErpIdRequest")
+__all__ = (
+    "CreateShippingAddressRequest",
+    "BulkSignUpByErpIdRequest",
+    "ListShippingAddressesRequest",
+    "ListBillingAddressesRequest",
+)

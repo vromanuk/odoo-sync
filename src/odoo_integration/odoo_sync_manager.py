@@ -256,7 +256,7 @@ class OdooSyncManager:
     def sync_users_to_odoo(self):
         send_users = True  # todo: extract this to configuration
         if send_users:
-            users = self.ordercast_manager.get_users()
+            users = self.ordercast_manager.get_users(odoo_repo=self.repo)
             logger.info(f"Loaded users => {len(users)}, started sending them to Odoo.")
             if users:
                 self.send_providerab.asd(users)

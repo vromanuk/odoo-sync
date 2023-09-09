@@ -3,6 +3,10 @@ from typing import Optional
 from pydantic import BaseModel, PositiveInt
 
 
+class BulkSignUpByErpIdRequest(BaseModel):
+    erp_id: PositiveInt
+
+
 class CreateShippingAddressRequest(BaseModel):
     merchant_id: PositiveInt
     name: str
@@ -15,3 +19,11 @@ class CreateShippingAddressRequest(BaseModel):
 
     class Config:
         exclude = {"merchant_id"}
+
+
+class ListBillingAddressesRequest(BaseModel):
+    merchant_id: PositiveInt
+
+
+class ListShippingAddressesRequest(BaseModel):
+    merchant_id: PositiveInt

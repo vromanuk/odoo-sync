@@ -86,6 +86,10 @@ class OdooAddress(BaseModel):
     address: PositiveInt
     original_address_id: PositiveInt
 
+    @classmethod
+    def from_json(cls, user_json: str) -> Self:
+        return cls(**json.loads(user_json))
+
 
 class OdooBasketProduct(BaseModel):
     odoo_id: PositiveInt

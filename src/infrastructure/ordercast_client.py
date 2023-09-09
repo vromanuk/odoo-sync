@@ -7,10 +7,14 @@ import structlog
 from fastapi import Depends
 
 from src.api import (
-    CreateShippingAddressRequest,
     OrdercastApiValidationException,
     OrdercastApiServerException,
+)
+from src.api import (
     BulkSignUpByErpIdRequest,
+    CreateShippingAddressRequest,
+    ListBillingAddressesRequest,
+    ListShippingAddressesRequest,
 )
 from src.config import OrdercastConfig, Settings, get_settings
 
@@ -51,17 +55,13 @@ class OrdercastApi:
         self._token = config.TOKEN
         self._auth_headers = {"Authorization": f"Bearer {self._token}"}
 
-    def get_user_by_email(self, email: str):
-        return f"{email}hello@gmail.com"
-
     @error_handler
     def bulk_sign_up_by_erp_id(self, request: BulkSignUpByErpIdRequest):
-        response = requests.post(
+        return requests.post(
             url=f"{self.base_url}/merchant/signup-erp-id/",
             data=request.model_dump(),
             headers=self._auth_headers,
         )
-        return response
 
     def get_merchant(self, email):
         pass
@@ -74,18 +74,30 @@ class OrdercastApi:
 
     @error_handler
     def create_shipping_address(self, request: CreateShippingAddressRequest):
-        response = requests.post(
+        return requests.post(
             url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping/",
             data=request.model_dump(),
             headers=self._auth_headers,
         )
-        return response
 
     def create_billing_info(self, enterprise_name, address_id, vat):
         pass
 
     def create_billing(self, name, user_id, billing_info_id):
         pass
+
+    @error_handler
+    def list_billing_addresses(self, request: ListBillingAddressesRequest):
+        return requests.get(
+            url=f"{self.base_url}/merchant/{request.merchant_id}/address/billing/",
+            headers=self._auth_headers,
+        )
+
+    def list_shipping_addresses(self, request: ListShippingAddressesRequest):
+        return requests.get(
+            url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping/",
+            headers=self._auth_headers,
+        )
 
 
 # @lru_cache()
