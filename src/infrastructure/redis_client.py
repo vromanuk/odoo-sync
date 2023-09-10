@@ -52,6 +52,9 @@ class RedisClient:
     def remove(self, key: str) -> None:
         self._client.unlink(key)
 
+    def ping(self):
+        return self._client.ping()
+
 
 # @lru_cache()
 def get_redis_client(
