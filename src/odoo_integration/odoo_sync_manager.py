@@ -11,7 +11,7 @@ from .helpers import is_empty, is_not_empty, has_objects
 from .odoo_manager import OdooManager, get_odoo_provider
 from .odoo_repo import OdooRepo, get_odoo_repo, OdooKeys
 from .ordercast_manager import OrdercastManager, get_ordercast_manager
-from .validators import validate_partners
+from .partner import validate_partners
 
 logger = structlog.getLogger(__name__)
 
@@ -278,7 +278,9 @@ class OdooSyncManager:
         )
 
         if has_objects(product_groups):
-            self.ordercast_manager.save_groups(product_groups, odoo_repo=self.repo)
+            self.ordercast_manager.save_product_groups(
+                product_groups, odoo_repo=self.repo
+            )
 
         # last_sync_date = (
         #     ProductExternal.objects.last_sync_date() if not full_sync else None

@@ -349,7 +349,7 @@ class OdooManager:
             i18n_fields=["name"],
             filter_criteria=[("is_published", "=", True), ("list_price", ">", 0.0)],
         )
-        result = list()
+        result = []
         for product_group in product_groups:
             group_dto = {"id": product_group["id"], "_remote_id": product_group["id"]}
             i18n_fields = get_i18n_field_as_dict(product_group, "name")
@@ -439,7 +439,7 @@ class OdooManager:
 
         def get_attribute(attribute_ids):
             if product_template_attributes and attribute_ids:
-                result_ids = list()
+                result_ids = []
                 for attribute in product_template_attributes:
                     if "id" in attribute and attribute["id"] in attribute_ids:
                         result_ids.extend(

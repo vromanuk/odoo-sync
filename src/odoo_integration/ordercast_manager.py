@@ -14,8 +14,6 @@ from .exceptions import OdooSyncException
 from .helpers import (
     is_not_empty,
     is_empty,
-    get_field_with_i18n_fields,
-    is_unique_by,
     is_length_not_in_range,
     get_i18n_field_as_dict,
     is_not_ref,
@@ -23,6 +21,12 @@ from .helpers import (
     str_to_int,
 )
 from .odoo_repo import OdooRepo, OdooKeys
+from .validators import (
+    validate_product_groups,
+    validate_categories,
+    validate_products,
+    validate_attributes,
+)
 
 logger = structlog.getLogger(__name__)
 
@@ -195,41 +199,9 @@ class OrdercastManager:
                 address_dto["_remote_id"] = external_address.odoo_id
             return address_dto
 
-    def save_groups(self, groups_dict, odoo_repo: OdooRepo):
-        groups = groups_dict["objects"]
-
-        unique_names_dict = dict()
-        has_error = False
-        for group in groups:
-            # validate required fields.
-            if is_empty(group, "id"):
-                logger.error(
-                    f"Received group with name '{group['name']}' has no remote id. Please correct it in Odoo."
-                )
-                has_error = True
-            field_with_i18n = get_field_with_i18n_fields(group, "name")
-            for field in field_with_i18n:
-                unique_names = unique_names_dict.setdefault(field, set())
-                if is_empty(group, field):
-                    logger.error(
-                        f"Received group with remote id '{group['id']}' has no '{field}' field. Please correct it in Odoo."
-                    )
-                    has_error = True
-                if not is_unique_by(unique_names, group, field):
-                    logger.error(
-                        f"Received group with '{field}' = '{group[field]}' should be unique. Please correct it in Odoo."
-                    )
-                    has_error = True
-                if is_length_not_in_range(group[field], 1, 191):
-                    logger.error(
-                        f"Received group with '{field}' = '{group[field]}' has more than max 191 symbols. Please correct it in Odoo."
-                    )
-                    has_error = True
-
-        if has_error:
-            raise OdooSyncException(
-                "Groups has errors. Please correct them in Odoo and try to sync again."
-            )
+    def save_product_groups(self, product_groups, odoo_repo: OdooRepo):
+        groups = product_groups["objects"]
+        validate_product_groups(groups)
 
         for group in groups:
             name = group["name"]
@@ -288,7 +260,7 @@ class OrdercastManager:
                 )
                 if existing_odoo_product_group:
                     if not exists_in_all_ids(
-                        existing_odoo_product_group.odoo_id, groups_dict
+                        existing_odoo_product_group.odoo_id, product_groups
                     ):
                         existing_odoo_product_group.odoo_id = group["id"]
                         existing_odoo_product_group.save()
@@ -323,187 +295,97 @@ class OrdercastManager:
 
     def save_categories(self, categories_dict: dict[str, Any]) -> None:
         categories = categories_dict["objects"]
-        if categories:
-            # TODO hide validation
-            categories = sorted(categories, key=lambda d: d["name"])
-            has_error = False
-            unique_names_dict = dict()
-            for category in categories:
-                if is_empty(category, "id"):
-                    logger.error(
-                        f"Received category with name '{category['name']}' has no remote id. Please correct it in Odoo."
-                    )
-                    has_error = True
 
-                field_with_i18n = get_field_with_i18n_fields(category, "name")
-                for field in field_with_i18n:
-                    unique_names = unique_names_dict.setdefault(field, set())
-                    if is_empty(category, field):
-                        logger.error(
-                            f"Received category with remote id '{category['id']}' has no '{field}' field. Please correct it in Odoo."
-                        )
-                        has_error = True
-                    if not is_unique_by(unique_names, category, field):
-                        logger.error(
-                            f"Received category with '{field}' = '{category[field]}' should be unique. Please correct it in Odoo."
-                        )
-                        has_error = True
-                    if is_length_not_in_range(category[field], 1, 127):
-                        logger.error(
-                            f"Received category with '{field}' = '{category[field]}' has more than max 127 symbols. Please correct it in Odoo."
-                        )
-                        has_error = True
+        if not categories:
+            return
 
-            if has_error:
-                raise OdooSyncException(
-                    "Categories has errors. Please correct them in Odoo and try to sync again."
-                )
+        categories = sorted(categories, key=lambda d: d["name"])
+        validate_categories(categories)
 
-            # TODO: check
-            for category in categories:  # set parent category
-                if "parent" in category and category["parent"] and "saved" in category:
-                    for parent in categories:
-                        if parent["id"] in category["parent"]:
-                            saved_child = category["saved"]
-                            saved_child.parent = parent["saved"]
-                            saved_child.save()
+        # TODO: check
+        for category in categories:  # set parent category
+            if "parent" in category and category["parent"] and "saved" in category:
+                for parent in categories:
+                    if parent["id"] in category["parent"]:
+                        saved_child = category["saved"]
+                        saved_child.parent = parent["saved"]
+                        saved_child.save()
 
-            # TODO: do we need it?
-            # for category in categories:  # set paths
-            #     if 'saved' in category:
-            #         Category.objects.set_path_defaults(category['saved'])
+        # TODO: do we need it?
+        # for category in categories:  # set paths
+        #     if 'saved' in category:
+        #         Category.objects.set_path_defaults(category['saved'])
 
-            self.ordercast_api.upsert_categories(categories)
+        self.ordercast_api.upsert_categories(categories)
 
     def save_attributes(self, attributes: dict[str, Any], odoo_repo: OdooRepo) -> None:
         attributes = attributes["objects"]
-        has_error = False
-        unique_names_dict = {}
-        for attribute in attributes:
-            if is_empty(attribute, "id"):
-                logger.error(
-                    f"Received attribute with name '{attribute['name']}' has no remote id. Please correct it in Odoo."
-                )
-                has_error = True
-            field_with_i18n = get_field_with_i18n_fields(attribute, "name")
-            for field in field_with_i18n:
-                unique_names = unique_names_dict.setdefault(field, set())
-                if is_empty(attribute, field):
-                    logger.error(
-                        f"Received attribute with remote id '{attribute['id']}' has no '{field}' field. Please correct it in Odoo."
-                    )
-                    has_error = True
-                if not is_unique_by(unique_names, attribute, field):
-                    logger.error(
-                        f"Received attribute with '{field}' = '{attribute[field]}' should be unique. Please correct it in Odoo."
-                    )
-                    has_error = True
-                if is_length_not_in_range(attribute[field], 1, 127):
-                    logger.error(
-                        f"Received attribute with '{field}' = '{attribute[field]}' has more than max 127 symbols. Please correct it in Odoo."
-                    )
-                    has_error = True
+
+        if not attributes:
+            return
+
+        validate_attributes(attributes)
+
+        for attribute in attributes:  # save locally received attributes
+            self.upsert_user(attribute, attributes, Category.PRODUCT_ATTRIBUTE_TYPE)
 
             if "values" in attribute:
-                value_unique_names_dict = {}
                 for value in attribute["values"]:
-                    if is_empty(value, "id"):
-                        logger.error(
-                            f"Received attribute value with name '{value['name']}' has no remote id. Please correct it in Odoo."
-                        )
-                        has_error = True
-                    value_field_with_i18n = get_field_with_i18n_fields(value, "name")
-                    for field in value_field_with_i18n:
-                        value_unique_names = value_unique_names_dict.setdefault(
-                            field, set()
-                        )
-                        if is_empty(value, field):
-                            logger.error(
-                                f"Received attribute value with remote id '{value['id']}' has no '{field}' field. Please correct it in Odoo."
+                    if "id" in value and "name" in value:
+                        defaults_data = {}
+                        if "position" in value:
+                            defaults_data["position"] = value["position"]
+
+                            i18n_fields = get_i18n_field_as_dict(value, "name")
+                            defaults_data.update(i18n_fields)
+                            # external_attribute_value = AttributeExternal.objects.filter(odoo_id=value["id"]).first()
+                            external_attribute_value = odoo_repo.get(
+                                keys=OdooKeys.ATTRIBUTES, entity_id=value["id"]
                             )
-                            has_error = True
-                        if not is_unique_by(value_unique_names, value, field):
-                            logger.error(
-                                f"Received attribute value with '{field}' = '{value[field]}' should be unique. Please correct it in Odoo."
-                            )
-                            has_error = True
-                        if is_length_not_in_range(value[field], 1, 191):
-                            logger.error(
-                                f"Received attribute value with '{field}' = '{value[field]}' has more than max 191 symbols. Please correct it in Odoo."
-                            )
-                            has_error = True
-
-        if has_error:
-            raise OdooSyncException(
-                "Attributes has errors. Please correct them in Odoo and try to sync again."
-            )
-
-        if attributes:
-            for attribute in attributes:  # save locally received attributes
-                self.upsert_user(attribute, attributes, Category.PRODUCT_ATTRIBUTE_TYPE)
-
-                if "values" in attribute:
-                    for value in attribute["values"]:
-                        if "id" in value and "name" in value:
-                            defaults_data = {}
-                            if "position" in value:
-                                defaults_data["position"] = value["position"]
-
-                                i18n_fields = get_i18n_field_as_dict(value, "name")
-                                defaults_data.update(i18n_fields)
-                                # external_attribute_value = AttributeExternal.objects.filter(odoo_id=value["id"]).first()
-                                external_attribute_value = odoo_repo.get_attribute(
-                                    value["id"]
+                            if external_attribute_value:
+                                defaults_data["name"] = value["name"]
+                                # saved, _ = Attribute.objects.update_or_create(
+                                #     id=external_attribute_value.attribute.id, defaults=defaults_data)
+                                saved = self.ordercast_api.upsert_attributes(
+                                    id=external_attribute_value.attribute.id,
+                                    defaults=defaults_data,
                                 )
-                                if external_attribute_value:
-                                    defaults_data["name"] = value["name"]
-                                    # saved, _ = Attribute.objects.update_or_create(
-                                    #     id=external_attribute_value.attribute.id, defaults=defaults_data)
-                                    saved = self.ordercast_api.upsert_attributes(
-                                        id=external_attribute_value.attribute.id,
-                                        defaults=defaults_data,
-                                    )
-                                else:
-                                    # saved, _ = Attribute.objects.update_or_create(name=value['name'],
-                                    #                                               defaults=defaults_data)
-                                    saved = self.ordercast_api.upsert_attributes(
-                                        name=value["name"], defaults=defaults_data
-                                    )
+                            else:
+                                # saved, _ = Attribute.objects.update_or_create(name=value['name'],
+                                #                                               defaults=defaults_data)
+                                saved = self.ordercast_api.upsert_attributes(
+                                    name=value["name"], defaults=defaults_data
+                                )
 
-                                    # existing_external_object = AttributeExternal.objects.filter(
-                                    #     attribute_id=saved.id).first()
-                                    existing_odoo_attribute = odoo_repo.get_attribute(
-                                        saved.id
-                                    )
-                                    if existing_odoo_attribute:
-                                        if not exists_in_all_ids(
-                                            existing_odoo_attribute.odoo_id,
-                                            attributes["attribute_values"],
-                                        ):
-                                            existing_odoo_attribute.odoo_id = value[
-                                                "id"
-                                            ]
-                                            existing_odoo_attribute.save()
-                                        elif (
-                                            existing_odoo_attribute.odoo_id
-                                            != value["id"]
-                                        ):
-                                            logger.warn(
-                                                f"There is more than one '{value['name']}' attribute value {[existing_odoo_attribute.odoo_id, value['id']]} in Odoo, so the first '{existing_odoo_attribute.odoo_id}' is used. "
-                                                f"Please inform Odoo administrators that attribute values should be unified and stored only in one instance."
-                                            )
+                                # existing_external_object = AttributeExternal.objects.filter(
+                                #     attribute_id=saved.id).first()
+                                existing_odoo_attribute = odoo_repo.get(
+                                    key=OdooKeys.ATTRIBUTES, entity_id=saved.id
+                                )
+                                if existing_odoo_attribute:
+                                    if not exists_in_all_ids(
+                                        existing_odoo_attribute.odoo_id,
+                                        attributes["attribute_values"],
+                                    ):
+                                        existing_odoo_attribute.odoo_id = value["id"]
                                         existing_odoo_attribute.save()
-                                    else:
-                                        # AttributeExternal.objects.update_or_create(attribute_id=saved.id,
-                                        #                                            odoo_id=value["id"])
-                                        odoo_repo.insert(
-                                            key=OdooKeys.ATTRIBUTES,
-                                            entity=OdooAttribute(
-                                                odoo_id=value["id"], attribute=saved.id
-                                            ),
+                                    elif existing_odoo_attribute.odoo_id != value["id"]:
+                                        logger.warn(
+                                            f"There is more than one '{value['name']}' attribute value {[existing_odoo_attribute.odoo_id, value['id']]} in Odoo, so the first '{existing_odoo_attribute.odoo_id}' is used. "
+                                            f"Please inform Odoo administrators that attribute values should be unified and stored only in one instance."
                                         )
-                                value["saved_id"] = saved.id
-                                value["saved"] = saved
+                                    existing_odoo_attribute.save()
+                                else:
+                                    # AttributeExternal.objects.update_or_create(attribute_id=saved.id,
+                                    #                                            odoo_id=value["id"])
+                                    odoo_repo.insert(
+                                        key=OdooKeys.ATTRIBUTES,
+                                        entity=OdooAttribute(
+                                            odoo_id=value["id"], attribute=saved.id
+                                        ),
+                                    )
+                            value["saved_id"] = saved.id
+                            value["saved"] = saved
 
     def save_products(
         self, categories, product_groups, attributes, products, odoo_repo: OdooRepo
@@ -513,56 +395,8 @@ class OrdercastManager:
         products = products["objects"]
         attributes = attributes["objects"]
         products = sorted(products, key=lambda d: d["display_name"])
-        # validate products
-        unique_refs = set()
-        has_error = False
-        for product in products:
-            if is_empty(product, "id"):
-                logger.error(
-                    f"Received product with name '{product['name']}' has no remote id. Please correct it in Odoo."
-                )
-                has_error = True
-            if is_empty(product, "code"):
-                logger.error(
-                    f"Received product with name '{product['name']}' has no reference code. Please correct it in Odoo."
-                )
-                has_error = True
-            if not is_unique_by(unique_refs, product, "code"):
-                logger.error(
-                    f"Received product with reference code '{product['code']}' should be unique. Please correct it in Odoo."
-                )
-                has_error = True
-            if "code" in product and is_length_not_in_range(product["code"], 1, 191):
-                logger.error(
-                    f"Received product with reference code '{product['code']}' has more than max 191 symbols. Please correct it in Odoo."
-                )
-                has_error = True
-            if "code" in product and is_not_ref(product["code"]):
-                logger.error(
-                    f"Received product with reference code '{product['code']}' should contain only alpha, numbers, hyphen and dot. Please correct it in Odoo."
-                )
-                has_error = True
 
-            field_with_i18n = get_field_with_i18n_fields(product, "display_name")
-            for field in field_with_i18n:
-                if is_empty(product, field):
-                    logger.error(
-                        f"Received product with id '{product['id']}' has no '{field}' field. Please correct it in Odoo."
-                    )
-                    has_error = True
-                else:
-                    display_name = product[field]
-                    display_name = re.sub(r"^\[.*] ?", "", display_name)
-                    if is_length_not_in_range(display_name, 1, 191):
-                        logger.error(
-                            f"Received product display name '{display_name}' has more than max 191 symbols. Please correct it in Odoo."
-                        )
-                        has_error = True
-
-        if has_error:
-            raise OdooSyncException(
-                "Products has errors. Please correct them in Odoo and try to sync again."
-            )
+        validate_products(products)
 
         saved_product_ids = []
         for product in products:
