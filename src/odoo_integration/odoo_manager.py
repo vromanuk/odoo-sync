@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Optional
 
 import structlog
 from fastapi import Depends
@@ -8,7 +8,7 @@ from odoo_rpc_client.connection.jsonrpc import JSONRPCError
 from src.data import OdooUser, OdooAddress
 from src.data.enums import PartnerType, PartnerAddressType
 from src.infrastructure import OdooClient, get_odoo_client
-from .helpers import is_empty, is_not_empty
+from .helpers import is_empty, is_not_empty, get_i18n_field_as_dict
 from .odoo_repo import OdooRepo, get_odoo_repo
 from .partner import Partner
 
@@ -340,6 +340,282 @@ class OdooManager:
             )
         )
         return send_partner
+
+    def get_product_groups(self, from_date: Optional[datetime]):
+        product_groups = self.get_remote_updated_objects(
+            "product.template",
+            from_date=from_date,
+            i18n_fields=["name"],
+            filter_criteria=[("is_published", "=", True), ("list_price", ">", 0.0)],
+        )
+        result = list()
+        for product_group in product_groups:
+            group_dto = {"id": product_group["id"], "_remote_id": product_group["id"]}
+            i18n_fields = get_i18n_field_as_dict(product_group, "name")
+            group_dto.update(i18n_fields)
+            if product_group["display_name"]:
+                group_dto["name"] = product_group["display_name"]
+            if product_group["name"]:
+                group_dto["name"] = product_group["name"]
+            if product_group["barcode"]:
+                group_dto["barcode"] = product_group["barcode"]
+            if product_group["default_code"]:
+                group_dto["ref"] = product_group["default_code"]
+            if product_group["image_1920"]:
+                group_dto["image"] = product_group["image_1920"]
+
+            result.append(group_dto)
+        return {
+            "all_ids": self._client.get_all_object_ids(
+                "product.template",
+                [("is_published", "=", True), ("list_price", ">", 0.0)],
+            ),
+            "objects": result,
+        }
+
+    def get_remote_updated_objects(
+        self,
+        remote_object_name,
+        object_external=None,
+        from_date=None,
+        sync_from_last_time=False,
+        i18n_fields=None,
+        filter_criteria=None,
+    ):
+        api_filter_criteria = []
+        if filter_criteria and type(filter_criteria) == list:
+            api_filter_criteria.extend(filter_criteria)
+
+        if sync_from_last_time and object_external:
+            from_date = object_external.objects.order_by("sync_date").last().sync_date
+
+        if from_date:
+            last_sync_date_str = from_date.strftime("%Y-%m-%d %H:%M:%S")
+            api_filter_criteria.append(("write_date", ">=", last_sync_date_str))
+
+        remote_ids = None
+        if object_external:
+            remote_ids = [
+                external.odoo_id for external in object_external.objects.all()
+            ]
+
+        if remote_ids:
+            items_limit = 100
+            if len(remote_ids) > items_limit:
+                objects_parts = []
+                for id_range in range(0, len(remote_ids), items_limit):
+                    local_api_filter_criteria = [
+                        ("id", "in", remote_ids[id_range : id_range + items_limit])
+                    ]
+                    objects_parts += self._client.get_objects(
+                        remote_object_name,
+                        api_filter_criteria + local_api_filter_criteria,
+                        i18n_fields=i18n_fields,
+                    )
+                remote_objects = objects_parts
+            else:
+                api_filter_criteria.append(("id", "in", remote_ids))
+                remote_objects = self._client.get_objects(
+                    remote_object_name, api_filter_criteria, i18n_fields=i18n_fields
+                )
+        else:
+            remote_objects = self._client.get_objects(
+                remote_object_name, api_filter_criteria, i18n_fields=i18n_fields
+            )
+        return remote_objects
+
+    def get_products(self, from_date=Optional[datetime]):
+        products = self.get_remote_updated_objects(
+            "product.product",
+            from_date=from_date,
+            i18n_fields=["display_name"],
+            filter_criteria=[("is_published", "=", True), ("list_price", ">", 0.0)],
+        )
+        product_template_attributes = self.get_remote_updated_objects(
+            "product.template.attribute.value", i18n_fields=["name"]
+        )
+        discounts = self._client.get_discounts()
+
+        def get_attribute(attribute_ids):
+            if product_template_attributes and attribute_ids:
+                result_ids = list()
+                for attribute in product_template_attributes:
+                    if "id" in attribute and attribute["id"] in attribute_ids:
+                        result_ids.extend(
+                            self._client.get_object(
+                                attribute["product_attribute_value_id"]
+                            )
+                        )
+                return result_ids
+
+        result = (
+            []
+        )  # todo: check [(p['product_template_attribute_value_ids'],p['attribute_line_ids']) for p  in products if len(p['product_template_attribute_value_ids']) > 0]
+        for product in products:
+            product_dto = {
+                "id": product["id"],
+                "_remote_id": product["id"],
+                "name": product["display_name"],
+            }
+            i18n_fields = get_i18n_field_as_dict(product, "display_name")
+            product_dto.update(i18n_fields)
+
+            if discounts:
+                product_dto["price_discounts"] = discounts
+
+            if "barcode" in product and product["barcode"]:
+                product_dto["barcode"] = product["barcode"]
+            if "display_name" in product and product["display_name"]:
+                product_dto["display_name"] = product["display_name"]
+            if "code" in product and product["code"]:
+                product_dto["code"] = product["code"]
+            if "partner_ref" in product and product["partner_ref"]:
+                product_dto["ref"] = product["partner_ref"]
+            if "lst_price" in product and product["lst_price"]:
+                product_dto["price"] = product["lst_price"]
+            elif "list_price" in product and product["list_price"]:
+                logger.warn(
+                    f"Product '{product['display_name']}' has no 'lst_price' so setting 'list_price'."
+                )
+                product_dto["price"] = product["list_price"]
+            if "image_1920" in product and product["image_1920"]:
+                product_dto["image"] = product["image_1920"]
+            if "volume" in product and product["volume"]:
+                product_dto["attr_volume"] = product["volume"]
+            if "volume_uom_name" in product and product["volume_uom_name"]:
+                product_dto["attr_volume_name"] = product["volume_uom_name"]
+            if "weight" in product and product["weight"]:
+                product_dto["attr_weight"] = product["weight"]
+            if "weight_uom_name" in product and product["weight_uom_name"]:
+                product_dto["attr_weight_name"] = product["weight_uom_name"]
+            if "color" in product and product["color"]:
+                product_dto["attr_color"] = product["color"]
+            if "uom_name" in product and product["uom_name"]:
+                product_dto["attr_unit"] = product["uom_name"]
+            if "base_unit_count" in product and product["base_unit_count"]:
+                product_dto["unit_count"] = product["base_unit_count"]
+            if "base_unit_price" in product and product["base_unit_price"]:
+                product_dto["unit_price"] = product["base_unit_price"]
+            if (
+                "product_template_attribute_value_ids" in product
+                and product["product_template_attribute_value_ids"]
+            ):
+                product_dto["attribute_values"] = get_attribute(
+                    product["product_template_attribute_value_ids"]
+                )
+            if product["public_categ_ids"] and len(product["public_categ_ids"]) > 0:
+                product_dto["category"] = self._client.get_object(
+                    product["public_categ_ids"]
+                )
+            if product["product_tmpl_id"] and len(product["product_tmpl_id"]) > 0:
+                product_dto["group"] = self._client.get_object(
+                    product["product_tmpl_id"]
+                )
+            if (
+                product["product_variant_ids"]
+                and len(product["product_variant_ids"]) > 0
+            ):
+                product_dto["product_variant"] = self._client.get_object(
+                    product["product_variant_ids"]
+                )
+            if product["attribute_line_ids"] and len(product["attribute_line_ids"]) > 0:
+                product_dto["attr_dynamic"] = self._client.get_object(
+                    product["attribute_line_ids"]
+                )
+            result.append(product_dto)
+        return {
+            "all_ids": self._client.get_all_object_ids(
+                "product.product",
+                [("is_published", "=", True), ("list_price", ">", 0.0)],
+            ),
+            "objects": result,
+        }
+
+    def get_categories(self, from_date=Optional[datetime]):
+        categories = self.get_remote_updated_objects(
+            "product.public.category", from_date=from_date, i18n_fields=["name"]
+        )
+        result = []
+        for category in categories:
+            category_dto = {
+                "id": category["id"],
+                "_remote_id": category["id"],
+                "name": category["name"],
+            }
+            i18n_fields = get_i18n_field_as_dict(category, "name")
+            category_dto.update(i18n_fields)
+            if category["parent_id"] and len(category["parent_id"]):
+                category_dto["parent"] = self._client.get_object(category["parent_id"])
+            if category["product_tmpl_ids"] and len(category["product_tmpl_ids"]) > 0:
+                category_dto["groups"] = self._client.get_object(
+                    category["product_tmpl_ids"]
+                )
+            if category["child_id"] and len(category["child_id"]) > 0:
+                category_dto["child"] = self._client.get_object(category["child_id"])
+            result.append(category_dto)
+        return {
+            "all_ids": self._client.get_all_object_ids("product.public.category")(),
+            "objects": result,
+        }
+
+    def get_product_attributes(
+        self, from_date=Optional[datetime], attribute_from_date=None
+    ):
+        attributes = self.get_remote_updated_objects(
+            "product.attribute", from_date=from_date, i18n_fields=["name"]
+        )
+        attribute_values = self.get_remote_updated_objects(
+            "product.attribute.value",
+            from_date=attribute_from_date,
+            i18n_fields=["name"],
+        )
+        result = []
+        if attributes:
+            for attribute in attributes:
+                attribute_dto = {"id": attribute["id"], "name": attribute["name"]}
+                i18n_fields = get_i18n_field_as_dict(attribute, "name")
+                attribute_dto.update(i18n_fields)
+                if (
+                    attribute["product_tmpl_ids"]
+                    and len(attribute["product_tmpl_ids"]) > 0
+                ):
+                    attribute_dto["groups"] = self._client.get_object(
+                        attribute["product_tmpl_ids"]
+                    )
+                result.append(attribute_dto)
+
+        if attribute_values:
+            for attribute_value in attribute_values:
+                attribute_id = attribute_value["attribute_id"]
+                if (
+                    attribute_id
+                    and type(attribute_id) == list
+                    and len(attribute_id) > 1
+                ):
+                    for attribute in result:
+                        if "id" in attribute and attribute["id"] == attribute_id[0]:
+                            if "values" not in attribute:
+                                attribute["values"] = list()
+                            attribute_value_dto = {
+                                "id": attribute_value["id"],
+                                "name": attribute_value["name"],
+                                "position": attribute_value["sequence"],
+                            }
+                            i18n_fields = get_i18n_field_as_dict(
+                                attribute_value, "name"
+                            )
+                            attribute_value_dto.update(i18n_fields)
+                            attribute["values"].append(attribute_value_dto)
+                else:
+                    print(f"There is no attribute for value {attribute_value}")
+        return {
+            "all_ids": self._client.get_all_object_ids("product.attribute"),
+            "objects": result,
+            "attribute_values": {
+                "all_ids": self._client.get_all_object_ids("product.attribute.value"),
+                "objects": None,
+            },
+        }
 
 
 # @lru_cache()

@@ -7,18 +7,20 @@ import structlog
 from fastapi import Depends
 
 from src.api import (
-    OrdercastApiValidationException,
-    OrdercastApiServerException,
-)
-from src.api import (
     BulkSignUpByErpIdRequest,
     CreateShippingAddressRequest,
     ListBillingAddressesRequest,
     ListShippingAddressesRequest,
 )
+from src.api import (
+    OrdercastApiValidationException,
+    OrdercastApiServerException,
+)
 from src.config import OrdercastConfig, Settings, get_settings
 
 logger = structlog.getLogger(__name__)
+
+OK_STATUSES = [HTTPStatus.OK, HTTPStatus.CREATED, HTTPStatus.NO_CONTENT]
 
 
 def error_handler(func):
@@ -34,7 +36,7 @@ def error_handler(func):
                 raise OrdercastApiValidationException(
                     f"Validation error for `{func_name}` request => {response.text}"
                 )
-            if response.status_code not in [HTTPStatus.OK, HTTPStatus.CREATED]:
+            if response.status_code not in OK_STATUSES:
                 logger.error(
                     f"Ordercast server error {response.status_code} {response.text} for `{func_name}`"
                 )
@@ -93,9 +95,42 @@ class OrdercastApi:
             headers=self._auth_headers,
         )
 
+    @error_handler
     def list_shipping_addresses(self, request: ListShippingAddressesRequest):
         return requests.get(
             url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping/",
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def upsert_categories(self, categories: list) -> None:
+        requests.post(
+            url=f"{self.base_url}/category/",
+            data=categories,
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def upsert_attributes(self, attributes) -> None:
+        requests.post(
+            url=f"{self.base_url}/attribute/",
+            data=attributes,
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def upsert_units(self, units: list) -> None:
+        requests.post(
+            url=f"{self.base_url}/product/unit/",
+            data=units,
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def upsert_products(self, products: list) -> None:
+        requests.post(
+            url=f"{self.base_url}/product/",
+            data=products,
             headers=self._auth_headers,
         )
 

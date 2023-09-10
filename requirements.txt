@@ -105,6 +105,8 @@ pyyaml==6.0.1
     #   uvicorn
 redis[hiredis]==5.0.0
     # via -r requirements.in
+regex==2023.8.8
+    # via -r requirements.in
 requests==2.31.0
     # via
     #   -r requirements.in

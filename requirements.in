@@ -8,3 +8,4 @@ mypy
 redis[hiredis]
 requests
 structlog
+regex

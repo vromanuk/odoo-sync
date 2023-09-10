@@ -3,7 +3,13 @@ from typing import Optional, Annotated
 from fastapi import Depends
 
 from src.config import Settings, get_settings
-from src.data.models import OdooUser, OdooAddress
+from src.data.models import (
+    OdooUser,
+    OdooAddress,
+    OdooProductGroup,
+    OdooAttribute,
+    OdooProduct,
+)
 from src.infrastructure import RedisClient, get_redis_client
 
 
@@ -14,14 +20,32 @@ class KeySchema:
     def odoo_users(self) -> str:
         return f"{self.prefix}:odoo:users"
 
-    def odoo_user(self, odoo_user_id: int) -> str:
-        return f"{self.odoo_users()}:{odoo_user_id}"
+    def odoo_user(self, user_id: int) -> str:
+        return f"{self.odoo_users()}:{user_id}"
 
-    def odoo_addresses(self):
+    def odoo_addresses(self) -> str:
         return f"{self.prefix}:odoo:addresses"
 
-    def odoo_address(self, odoo_id):
-        return f"{self.odoo_addresses()}:{odoo_id}"
+    def odoo_address(self, address_id: int) -> str:
+        return f"{self.odoo_addresses()}:{address_id}"
+
+    def odoo_product_groups(self) -> str:
+        return f"{self.prefix}:odoo:product_groups"
+
+    def odoo_product_group(self, product_group_id: int) -> str:
+        return f"{self.odoo_product_groups()}:{product_group_id}"
+
+    def odoo_attributes(self) -> str:
+        return f"{self.prefix}:odoo:attributes"
+
+    def odoo_attribute(self, attribute_id: int) -> str:
+        return f"{self.odoo_attributes()}:{attribute_id}"
+
+    def odoo_products(self) -> str:
+        return f"{self.prefix}:odoo:products"
+
+    def odoo_product(self, product_id: int) -> str:
+        return f"{self.odoo_products()}:{product_id}"
 
 
 class OdooRepo:
@@ -50,7 +74,7 @@ class OdooRepo:
     def remove_user(self, user_id: int) -> None:
         self._client.remove(self._schema.odoo_user(user_id))
 
-    def save_address(self, address: OdooAddress):
+    def save_address(self, address: OdooAddress) -> None:
         self._client.insert(
             address,
             self._schema.odoo_addresses(),
@@ -63,6 +87,45 @@ class OdooRepo:
 
     def remove_address(self, address_id: int):
         self._client.remove(self._schema.odoo_address(address_id))
+
+    def get_product_group(self, product_group_id: int) -> Optional[OdooProductGroup]:
+        product_group_json = self._client.get(
+            self._schema.odoo_product_group(product_group_id)
+        )
+        return (
+            OdooProductGroup.from_json(product_group_json)
+            if product_group_json
+            else None
+        )
+
+    def save_product_group(self, product_group: OdooProductGroup) -> None:
+        self._client.insert(
+            product_group,
+            self._schema.odoo_addresses(),
+            self._schema.odoo_address(product_group.odoo_id),
+        )
+
+    def get_attribute(self, attribute_id: int) -> Optional[OdooAttribute]:
+        attribute_json = self._client.get(self._schema.odoo_attribute(attribute_id))
+        return OdooAttribute.from_json(attribute_json) if attribute_json else None
+
+    def save_attribute(self, attribute: OdooAttribute) -> None:
+        self._client.insert(
+            attribute,
+            self._schema.odoo_addresses(),
+            self._schema.odoo_address(attribute.odoo_id),
+        )
+
+    def get_product(self, product_id: int) -> Optional[OdooProduct]:
+        product_json = self._client.get(self._schema.odoo_product(product_id))
+        return OdooProduct.from_json(product_json) if product_json else None
+
+    def save_product(self, product: OdooProduct) -> None:
+        self._client.insert(
+            product,
+            self._schema.odoo_products(),
+            self._schema.odoo_product(product.odoo_id),
+        )
 
 
 # @lru_cache()

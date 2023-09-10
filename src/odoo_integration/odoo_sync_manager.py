@@ -6,8 +6,8 @@ from typing import Annotated
 import structlog
 from fastapi import Depends
 
-from src.data import UserStatus, OdooUser, OdooAddress
-from .helpers import is_empty, is_not_empty
+from src.data import UserStatus, OdooUser, OdooAddress, OdooProductGroup, OdooProduct
+from .helpers import is_empty, is_not_empty, has_objects
 from .odoo_manager import OdooManager, get_odoo_provider
 from .odoo_repo import OdooRepo, get_odoo_repo
 from .ordercast_manager import OrdercastManager, get_ordercast_manager
@@ -31,9 +31,9 @@ class OdooSyncManager:
         logger.info("Start full syncing with Odoo.")
         self.sync_users()
 
-        # self.logger.info("Start receive products data from Odoo")
-        # self.receive_products(products_full_sync)
-        #
+        logger.info("Start receiving products from Odoo")
+        self.sync_products(full_sync=True)
+
         # self.logger.info("Start receive order data from Odoo")
         # self.receive_order_data()
 
@@ -254,6 +254,88 @@ class OdooSyncManager:
             logger.info(f"Loaded users => {len(users)}, started sending them to Odoo.")
             if users:
                 self.odoo_manager.sync_users(users)
+
+    def sync_products(self, full_sync=False):
+        # last_sync_date = (
+        #     ProductGroupExternal.objects.last_sync_date() if not full_sync else None
+        # )
+        last_sync_date = (
+            None if full_sync else self.repo.get_last_sync_date(OdooProductGroup)
+        )
+        # groups_dict = self.receive_provider.receive_product_groups(last_sync_date)
+        product_groups = self.odoo_manager.get_product_groups(last_sync_date)
+
+        logger.info(f"Connected to Odoo")
+        logger.info(
+            f"Received {len(product_groups['objects']) if has_objects(product_groups) else 0} groups, start saving them."
+        )
+
+        if has_objects(product_groups):
+            self.ordercast_manager.save_groups(product_groups, odoo_repo=self.repo)
+
+        # last_sync_date = (
+        #     ProductExternal.objects.last_sync_date() if not full_sync else None
+        # )
+        last_sync_date = (
+            None if full_sync else self.repo.get_last_sync_date(OdooProduct)
+        )
+        products = self.odoo_manager.get_products(last_sync_date)
+        has_products = has_objects(products)
+
+        logger.info(
+            f"Received {len(products['objects']) if has_products else 0} products."
+        )
+
+        if (
+            has_products
+        ):  # in case when any product is changed sync from begin the categories. bug: when product category changed, but not synced
+            category_last_sync_date = None
+            logger.info(f"There products are changed, receiving all categories.")
+        else:
+            # category_last_sync_date = CategoryExternal.objects.last_sync_date()
+            category_last_sync_date = self.repo.get_last_sync_date(OdooCategory)
+
+        categories = self.odoo_manager.get_categories(category_last_sync_date)
+
+        logger.info(
+            f"Received {len(categories['objects']) if categories['objects'] else 0} categories, start saving them."
+        )
+
+        if categories:
+            self.ordercast_manager.save_categories(categories)
+        if not full_sync:
+            last_attribute_name_sync = (
+                CategoryExternal.objects.filter(
+                    category__category_type=Category.PRODUCT_ATTRIBUTE_TYPE
+                )
+                .order_by("sync_date")
+                .last()
+            )
+            attribute_category_from_date = None
+            if last_attribute_name_sync:
+                attribute_category_from_date = last_attribute_name_sync.sync_date
+
+            attributes = self.odoo_manager.get_product_attributes(
+                from_date=attribute_category_from_date,
+                attribute_from_date=AttributeExternal.objects.last_sync_date(),
+            )
+        else:
+            attributes = self.odoo_manager.get_product_attributes()
+
+        logger.info(
+            f"Received {len(attributes['objects']) if attributes['objects'] else 0} attributes with total of {sum([len(a['values']) for a in attributes['objects'] if 'values' in a])} values, start saving them."
+        )
+
+        if attributes:
+            self.ordercast_manager.save_attributes(attributes, odoo_repo=self.repo)
+
+        if has_products:
+            logger.info(
+                f"Starting saving products after saving categories and attributes."
+            )
+            self.ordercast_manager.save_products(
+                categories, product_groups, attributes, products, odoo_repo=self.repo
+            )
 
 
 @lru_cache()
