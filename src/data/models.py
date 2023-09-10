@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import Self
+from typing import Self, Optional
 
 from pydantic import BaseModel, PositiveInt
 
@@ -11,7 +11,7 @@ class OdooCommons(BaseModel):
     odoo_id: PositiveInt
     created_at: datetime = datetime.now(timezone.utc)
     updated_at: datetime = datetime.now(timezone.utc)
-    sync_date: datetime
+    sync_date: Optional[datetime]
 
 
 class OdooProductGroup(OdooCommons):

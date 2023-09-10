@@ -9,7 +9,7 @@ from fastapi import Depends
 from src.data import UserStatus, OdooUser, OdooAddress, OdooProductGroup, OdooProduct
 from .helpers import is_empty, is_not_empty, has_objects
 from .odoo_manager import OdooManager, get_odoo_provider
-from .odoo_repo import OdooRepo, get_odoo_repo
+from .odoo_repo import OdooRepo, get_odoo_repo, OdooKeys
 from .ordercast_manager import OrdercastManager, get_ordercast_manager
 from .validators import validate_partners
 
@@ -56,7 +56,7 @@ class OdooSyncManager:
         self.sync_users_to_odoo()
 
     def sync_users_from_odoo(self):
-        users = self.repo.get_users()
+        users = self.repo.get_many(key=OdooKeys.USERS)
         partners = validate_partners(
             self.odoo_manager.receive_partner_users(
                 exclude_user_ids=[p.odoo_id for p in users]
@@ -70,7 +70,7 @@ class OdooSyncManager:
             # if 'email' in partner and partner['email']:
             if partner.email:
                 # external_user = UserExternal.all_objects.filter(odoo_id=partner["id"]).first()
-                odoo_user = self.repo.get_user(partner.id)
+                odoo_user = self.repo.get(key=OdooKeys.USERS, entity_id=partner.id)
                 if not odoo_user:
                     email = partner["email"]
                     # exists_by_email = User.all_objects.filter(email=email).first()
@@ -80,22 +80,27 @@ class OdooSyncManager:
                             f"User with email {email} already exists, ignoring."
                         )
                         # existing_external_object = UserExternal.all_objects.filter(user_id=exists_by_email.id).first()
-                        existing_odoo_user = self.repo.get_user(ordercast_partner.id)
+                        existing_odoo_user = self.repo.get(
+                            key=OdooKeys.USERS, entity_id=ordercast_partner.id
+                        )
                         if existing_odoo_user:
                             logger.warning(
                                 f"This user already mapped to Odoo id: {existing_odoo_user.odoo_id}, but this user come with id: {partner['id']}."
                             )
-                            self.repo.remove_user(existing_odoo_user.odoo_id)
+                            self.repo.remove(
+                                key=OdooKeys.USERS, entity_id=existing_odoo_user.odoo_id
+                            )
                             # existing_external_object.is_removed = False
                             # existing_external_object.save()
                         else:
                             # UserExternal.all_objects.update_or_create(user_id=exists_by_email.id, odoo_id=partner["id"])
-                            self.repo.save_user(
-                                OdooUser(
+                            self.repo.insert(
+                                key=OdooKeys.USERS,
+                                entity=OdooUser(
                                     odoo_id=partner["id"],
                                     sync_date=datetime.now(timezone.utc),
                                     user=ordercast_partner.id,
-                                )
+                                ),
                             )
                     else:
                         name = partner["name"]
@@ -116,12 +121,13 @@ class OdooSyncManager:
 
                         # UserExternal.all_objects.update_or_create(user_id=saved.id, odoo_id=partner["id"],
                         #                                           defaults={'is_removed': False})
-                        self.repo.save_user(
-                            OdooUser(
+                        self.repo.insert(
+                            key=OdooKeys.USERS,
+                            entity=OdooUser(
                                 odoo_id=partner["id"],
                                 sync_date=datetime.now(timezone.utc),
                                 user=saved.id,
-                            )
+                            ),
                         )
 
                         partner["saved_id"] = saved.id
@@ -237,13 +243,14 @@ class OdooSyncManager:
                 user_id=user.id, name=name, defaults=defaults_address
             )
             # AddressExternal.objects.update_or_create(address_id=saved.id, odoo_id=address['id'])
-            self.repo.save_address(
-                OdooAddress(
+            self.repo.insert(
+                key=OdooKeys.ADDRESSES,
+                entity=OdooAddress(
                     odoo_id=address["id"],
                     sync_date=datetime.now(timezone.utc),
                     address=address.id,
                     original_address_id=address.id,
-                )
+                ),
             )
             return address
 

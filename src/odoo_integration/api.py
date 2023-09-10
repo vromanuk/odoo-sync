@@ -34,27 +34,25 @@ async def sync(
     #         user=1,
     #     )
     # )
-    # odoo_sync_manager.repo.save_users(
+    # odoo_sync_manager.repo.insert_many(
+    #     key=OdooKeys.USERS,
+    #     entities=
     #     [
     #         OdooUser(
     #             odoo_id=2,
-    #             created_at=datetime.now(timezone.utc),
-    #             updated_at=datetime.now(timezone.utc),
     #             sync_date=None,
     #             user=2,
     #         ),
     #         OdooUser(
     #             odoo_id=3,
-    #             created_at=datetime.now(timezone.utc),
-    #             updated_at=datetime.now(timezone.utc),
     #             sync_date=None,
     #             user=3,
     #         ),
     #     ]
     # )
-    # logger.info(f"{odoo_sync_manager.repo.get_user(1)}, got user")
+    # logger.info(f"{odoo_sync_manager.repo.get(key=OdooKeys.USERS, entity_id=1)}, got user")
     #
-    # logger.info(f"{odoo_sync_manager.repo.get_users()}, got users")
+    # logger.info(f"{odoo_sync_manager.repo.get_many(key=OdooKeys.USERS)}, got users")
 
     return Response(message="Started full sync")
 

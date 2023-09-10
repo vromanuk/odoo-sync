@@ -1,7 +1,7 @@
 import structlog
 
 from .helpers import is_empty, is_unique_by, is_length_not_in_range
-from .odoo_repo import OdooRepo
+from .odoo_repo import OdooRepo, OdooKeys
 from .ordercast_manager import OrdercastManager
 
 logger = structlog.getLogger(__name__)
@@ -47,7 +47,7 @@ def validate_partners(
             # existing_external_object = UserExternal.all_objects.filter(
             #     user_id=exists_by_email.id
             # ).first()
-            odoo_user = odoo_repo.get_user(ordercast_user.id)
+            odoo_user = odoo_repo.get(key=OdooKeys.USERS, entity_id=ordercast_user.id)
             if odoo_user and odoo_user.odoo_id != user["id"]:
                 logger.error(
                     f"Received user with email '{user['email']}' already exists locally and it's Odoo id is '{odoo_user.odoo_id}' and name is '{ordercast_user.name}' coming Odoo id is '{user['id']}' and name is '{user['name']}'. Please give the another email to this '{user['name']}' partner in Odoo (check partners which has no children or archived)."

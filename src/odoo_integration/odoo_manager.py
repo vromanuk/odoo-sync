@@ -9,7 +9,7 @@ from src.data import OdooUser, OdooAddress
 from src.data.enums import PartnerType, PartnerAddressType
 from src.infrastructure import OdooClient, get_odoo_client
 from .helpers import is_empty, is_not_empty, get_i18n_field_as_dict
-from .odoo_repo import OdooRepo, get_odoo_repo
+from .odoo_repo import OdooRepo, get_odoo_repo, OdooKeys
 from .partner import Partner
 
 logger = structlog.getLogger(__name__)
@@ -174,12 +174,13 @@ class OdooManager:
             # UserExternal.all_objects.update_or_create(
             #     user_id=user["id"], defaults={"odoo_id": remote_id, "is_removed": False}
             # )
-            self._repo.save_user(
-                OdooUser(
+            self._repo.insert(
+                key=OdooKeys.USERS,
+                entity=OdooUser(
                     odoo_id=remote_id,
                     sync_date=datetime.now(timezone.utc),
                     user=user["id"],
-                )
+                ),
             )
 
             if billing_addresses:
@@ -321,7 +322,7 @@ class OdooManager:
                 )
                 if remote_id:
                     # AddressExternal.all_objects.filter(odoo_id=remote_id).delete()
-                    self._repo.remove_address(remote_id)
+                    self._repo.remove(key=OdooKeys.ADDRESSES, entity_id=remote_id)
 
         if create_remote_partner:
             remote_id = remote_partner_obj.create(send_partner)
@@ -331,13 +332,14 @@ class OdooManager:
         # AddressExternal.objects.update_or_create(
         #     address_id=partner["id"], odoo_id=remote_id, defaults={"is_removed": False}
         # )
-        self._repo.save_address(
-            OdooAddress(
+        self._repo.insert(
+            key=OdooKeys.ADDRESSES,
+            entity=OdooAddress(
                 odoo_id=remote_id,
                 sync_date=datetime.now(timezone.utc),
                 address=partner["id"],
                 original_address_id=partner["id"],
-            )
+            ),
         )
         return send_partner
 

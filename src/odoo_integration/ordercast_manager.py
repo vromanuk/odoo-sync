@@ -22,7 +22,7 @@ from .helpers import (
     exists_in_all_ids,
     str_to_int,
 )
-from .odoo_repo import OdooRepo
+from .odoo_repo import OdooRepo, OdooKeys
 
 logger = structlog.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class OrdercastManager:
             user_dto = {"id": user.id, "name": user.name}
 
             # user_remote = UserExternal.objects.filter(user_id=user.id).first()
-            user_remote = odoo_repo.get_user(user.id)
+            user_remote = odoo_repo.get(key=OdooKeys.USERS, entity_id=user.id)
             if user_remote:
                 user_dto["_remote_id"] = user_remote.odoo_id
             # if user.erp_id:
@@ -188,7 +188,9 @@ class OrdercastManager:
             # external_address = AddressExternal.objects.filter(
             #     address_id=address_id
             # ).first()
-            external_address = odoo_repo.get_address(address_id)
+            external_address = odoo_repo.get(
+                key=OdooKeys.ADDRESSES, entity_id=address_id
+            )
             if external_address:
                 address_dto["_remote_id"] = external_address.odoo_id
             return address_dto
@@ -259,7 +261,9 @@ class OrdercastManager:
             # external_group = ProductGroupExternal.objects.filter(
             #     odoo_id=group["id"]
             # ).first()
-            odoo_product_group = odoo_repo.get_product_group(group["id"])
+            odoo_product_group = odoo_repo.get(
+                key=OdooKeys.PRODUCT_GROUPS, entity_id=group["id"]
+            )
             defaults["is_removed"] = False
             if odoo_product_group:
                 defaults["ref"] = ref
@@ -279,7 +283,9 @@ class OrdercastManager:
                 # existing_odoo_product_group = ProductGroupExternal.objects.filter(
                 #     product_group=saved
                 # ).first()
-                existing_odoo_product_group = odoo_repo.get_product_group(saved.id)
+                existing_odoo_product_group = odoo_repo.get(
+                    key=OdooKeys.PRODUCT_GROUPS, entity_id=saved.id
+                )
                 if existing_odoo_product_group:
                     if not exists_in_all_ids(
                         existing_odoo_product_group.odoo_id, groups_dict
@@ -297,8 +303,11 @@ class OrdercastManager:
                     # ProductGroupExternal.objects.update_or_create(
                     #     product_group_id=saved.id, odoo_id=group["id"]
                     # )
-                    odoo_repo.save_product_group(
-                        OdooProductGroup(odoo_id=group["id"], product_group=saved.id)
+                    odoo_repo.insert(
+                        key=OdooKeys.PRODUCT_GROUPS,
+                        entity=OdooProductGroup(
+                            odoo_id=group["id"], product_group=saved.id
+                        ),
                     )
 
             # TODO: do we need it?
@@ -487,10 +496,11 @@ class OrdercastManager:
                                     else:
                                         # AttributeExternal.objects.update_or_create(attribute_id=saved.id,
                                         #                                            odoo_id=value["id"])
-                                        odoo_repo.save_attribute(
-                                            OdooAttribute(
+                                        odoo_repo.insert(
+                                            key=OdooKeys.ATTRIBUTES,
+                                            entity=OdooAttribute(
                                                 odoo_id=value["id"], attribute=saved.id
-                                            )
+                                            ),
                                         )
                                 value["saved_id"] = saved.id
                                 value["saved"] = saved
@@ -611,7 +621,7 @@ class OrdercastManager:
             defaults["is_removed"] = False
 
             # odoo_product = ProductExternal.objects.filter(odoo_id=remote_id).first()
-            odoo_product = odoo_repo.get_product(remote_id)
+            odoo_product = odoo_repo.get(key=OdooKeys.PRODUCTS, entity_id=remote_id)
             if odoo_product:
                 defaults["ref"] = ref
                 # saved_product, _ = Product.all_objects.update_or_create(id=odoo_product.product.id,
@@ -625,7 +635,9 @@ class OrdercastManager:
                     ref=ref, defaults=defaults
                 )
                 # existing_odoo_product = ProductExternal.objects.filter(product__id=saved_product.id).first()
-                existing_odoo_product = odoo_repo.get_product(saved_product.id)
+                existing_odoo_product = odoo_repo.get(
+                    key=OdooKeys.PRODUCTS, entity_id=saved_product.id
+                )
 
                 if existing_odoo_product:
                     if not exists_in_all_ids(existing_odoo_product.odoo_id, products):
@@ -640,8 +652,9 @@ class OrdercastManager:
                     # self.remove_duplicate_object_id(remote_id, products_dict)
                 else:
                     # ProductExternal.objects.update_or_create(product_id=saved_product.id, odoo_id=remote_id)
-                    odoo_repo.save_product(
-                        OdooProduct(odoo_id=remote_id, product=saved_product.id)
+                    odoo_repo.insert(
+                        key=OdooKeys.PRODUCTS,
+                        entity=OdooProduct(odoo_id=remote_id, product=saved_product.id),
                     )
 
             # clear current categories and attributes.
