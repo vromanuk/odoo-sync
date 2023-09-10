@@ -5,8 +5,7 @@ import structlog
 from fastapi import Depends
 from odoo_rpc_client.connection.jsonrpc import JSONRPCError
 
-from src.data import OdooUser, OdooAddress
-from src.data.enums import PartnerType, PartnerAddressType
+from src.data import OdooUser, OdooAddress, PartnerType, PartnerAddressType
 from src.infrastructure import OdooClient, get_odoo_client
 from .helpers import is_empty, is_not_empty, get_i18n_field_as_dict
 from .odoo_repo import OdooRepo, get_odoo_repo, OdooKeys

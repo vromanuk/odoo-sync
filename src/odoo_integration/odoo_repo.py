@@ -4,8 +4,8 @@ from typing import Optional, Annotated
 from fastapi import Depends
 
 from src.config import Settings, get_settings
-from src.data import OdooEntity
-from src.data.models import (
+from src.data import (
+    OdooEntity,
     OdooUser,
     OdooAddress,
     OdooProductGroup,
