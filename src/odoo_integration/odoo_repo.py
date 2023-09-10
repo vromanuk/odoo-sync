@@ -50,12 +50,8 @@ class OdooRepo:
 
     def get_many(self, key: OdooKeys) -> list[OdooEntity]:
         entity_schema = self._schema.get(key)
-        (
-            entity_key,
-            entity_model,
-        ) = entity_schema.get(
-            "key"
-        ), entity_schema.get("model")
+        entity_key = entity_schema.get("key")
+        entity_model = entity_schema.get("model")
 
         return [
             entity_model.from_json(entity_json)
@@ -64,12 +60,8 @@ class OdooRepo:
 
     def get(self, key: OdooKeys, entity_id: int) -> Optional[OdooEntity]:
         entity_schema = self._schema.get(key)
-        (
-            entity_key,
-            entity_model,
-        ) = entity_schema.get(
-            "key"
-        ), entity_schema.get("model")
+        entity_key = entity_schema.get("key")
+        entity_model = entity_schema.get("model")
 
         entity_json = self._client.get(f"{entity_key}:{entity_id}")
         return entity_model.from_json(entity_json) if entity_json else None
@@ -92,9 +84,9 @@ class OdooRepo:
 
     def remove(self, key: OdooKeys, entity_id: int) -> None:
         entity_schema = self._schema.get(key)
-        entity_key = f'{entity_schema.get("key")}:{entity_id}'
+        entity_key = entity_schema.get("key")
 
-        self._client.remove(entity_key)
+        self._client.remove(f"{entity_key}:{entity_id}")
 
 
 # @lru_cache()
