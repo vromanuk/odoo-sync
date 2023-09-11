@@ -8,7 +8,13 @@ from src.api import (
     ListBillingAddressesRequest,
     ListShippingAddressesRequest,
 )
-from src.data import OdooProductGroup, OdooAttribute, OdooProduct
+from src.data import (
+    OdooProductGroup,
+    OdooAttribute,
+    OdooProduct,
+    OdooDeliveryOption,
+    OdooWarehouse,
+)
 from src.infrastructure import OrdercastApi, get_ordercast_api
 from .exceptions import OdooSyncException
 from .helpers import (
@@ -26,6 +32,8 @@ from .validators import (
     validate_categories,
     validate_products,
     validate_attributes,
+    validate_delivery_options,
+    validate_warehouses,
 )
 
 logger = structlog.getLogger(__name__)
@@ -687,6 +695,152 @@ class OrdercastManager:
             False,
         )
         delete_attributes(attribute_value_ids)
+
+    def save_delivery_option(
+        self, delivery_options_dict: dict[str, Any], odoo_repo: OdooRepo
+    ):
+        delivery_options = delivery_options_dict["objects"]
+        if not delivery_options:
+            logger.info(f"Deleting delivery options.")
+            delivery_option_ids = odoo_repo.get_many(key=OdooKeys.DELIVERY_OPTIONS)
+
+            # TODO: HANDLE
+            if delivery_option_ids:
+                pass
+            #     delivery_option_for_delete = DeliveryOption.objects.exclude(id__in=delivery_option_ids)
+            #     DeliveryOptionExternal.all_objects.filter(
+            #         delivery_option_id__in=delivery_option_for_delete.values_list('pk', flat=True)).delete()
+            #     delivery_option_for_delete.delete()
+            return
+
+        validate_delivery_options(delivery_options)
+
+        for delivery_option in delivery_options:
+            if "name" in delivery_option and delivery_option["name"]:
+                name = delivery_option["name"]
+                i18n_fields = get_i18n_field_as_dict(delivery_option, "name")
+                defaults_data = {"name": name}
+                defaults_data.update(i18n_fields)
+                defaults_data["code"] = self.get_unique_code(
+                    name,
+                    "name",
+                    DeliveryOption.all_objects.exclude(
+                        id=delivery_option["id"]
+                    ).order_by("name"),
+                    "code",
+                    False,
+                    symbol_count=3,
+                    max_length=16,
+                )
+
+                # external_delivery_option = DeliveryOptionExternal.objects.filter(
+                #     odoo_id=delivery_option["id"]).first()
+                odoo_delivery_option = odoo_repo.get(
+                    key=OdooKeys.DELIVERY_OPTIONS, entity_id=delivery_option["id"]
+                )
+                if odoo_delivery_option:
+                    # saved, _ = DeliveryOption.objects.update_or_create(
+                    #     id=odoo_delivery_option.delivery_option.id, defaults=defaults_data)
+                    # odoo_delivery_option.save()
+                    saved = self.ordercast_api.create_delivery_option()
+                else:
+                    defaults_data["is_removed"] = False
+                    # saved, _ = DeliveryOption.all_objects.update_or_create(name=name, defaults=defaults_data)
+                    saved = self.ordercast_api.create_delivery_option()
+
+                    existing_odoo_delivery_option = (
+                        DeliveryOptionExternal.all_objects.filter(
+                            delivery_option_id=saved.id
+                        ).first()
+                    )
+                    if existing_odoo_delivery_option:
+                        if not exists_in_all_ids(
+                            existing_odoo_delivery_option.odoo_id, delivery_options_dict
+                        ):
+                            existing_odoo_delivery_option.odoo_id = delivery_option[
+                                "id"
+                            ]
+                            existing_odoo_delivery_option.save()
+                        elif (
+                            existing_odoo_delivery_option.odoo_id
+                            != delivery_option["id"]
+                        ):
+                            logger.warn(
+                                f"There is more than one '{delivery_option['name']}' delivery option {[existing_odoo_delivery_option.odoo_id, delivery_option['id']]} in Odoo, so the first '{existing_odoo_delivery_option.odoo_id}' is used. "
+                                f"Please inform Odoo administrators that delivery option names should be unified and stored only in one instance."
+                            )
+                        existing_odoo_delivery_option.save()
+                    else:
+                        # DeliveryOptionExternal.objects.update_or_create(delivery_option_id=saved.id,
+                        #                                                 odoo_id=delivery_option["id"])
+                        odoo_repo.insert(
+                            key=OdooKeys.DELIVERY_OPTIONS,
+                            entity=OdooDeliveryOption(
+                                odoo_id=delivery_option["id"], delivery_option=saved.id
+                            ),
+                        )
+                delivery_option["saved_id"] = saved.id
+                delivery_option["saved"] = saved
+
+    def save_warehouse(self, warehouses_dict, odoo_repo: OdooRepo):
+        warehouses = warehouses_dict["objects"]
+        if not warehouses:
+            logger.info(f"Deleting warehouses.")
+            warehouse_ids = odoo_repo.get_many(OdooKeys.WAREHOUSES)
+            # TODO HANDLE
+            if warehouse_ids:
+                pass
+                # warehouses_for_delete = Warehouse.objects.exclude(id__in=warehouse_ids)
+                # WarehouseExternal.all_objects.filter(
+                #     warehouse_id__in=warehouses_for_delete.values_list('pk', flat=True)).delete()
+                # warehouses_for_delete.delete()
+
+        validate_warehouses(warehouses)
+
+        for warehouse in warehouses:
+            if "name" in warehouse and warehouse["name"]:
+                name = warehouse["name"]
+                i18n_fields = get_i18n_field_as_dict(warehouse, "name")
+                defaults_data = {"name": name}
+                defaults_data.update(i18n_fields)
+                # odoo_warehouse = WarehouseExternal.objects.filter(odoo_id=warehouse["id"]).first()
+                odoo_warehouse = odoo_repo.get(
+                    OdooKeys.WAREHOUSES, entity_id=warehouse["id"]
+                )
+                if odoo_warehouse:
+                    # saved = Warehouse.objects.update_or_create(id=odoo_warehouse.warehouse.id,
+                    #                                               defaults=defaults_data)
+                    saved = self.ordercast_api.create_warehouse()
+                else:
+                    defaults_data["is_removed"] = False
+                    # saved, _ = Warehouse.all_objects.update_or_create(name=name, defaults=defaults_data)
+                    saved = self.ordercast_api.create_warehouse()
+
+                    existing_odoo_warehouse = odoo_repo.get(
+                        key=OdooKeys.WAREHOUSES, entity_id=saved.id
+                    )
+
+                    if existing_odoo_warehouse:
+                        if not exists_in_all_ids(
+                            existing_odoo_warehouse.odoo_id, warehouses_dict
+                        ):
+                            existing_odoo_warehouse.odoo_id = warehouse["id"]
+                            existing_odoo_warehouse.save()
+                        elif existing_odoo_warehouse.odoo_id != warehouse["id"]:
+                            logger.warn(
+                                f"There is more than one '{warehouse['name']}' warehouse {[existing_odoo_warehouse.odoo_id, warehouse['id']]} in Odoo, so the first '{existing_odoo_warehouse.odoo_id}' is used. "
+                                f"Please inform Odoo administrators that warehouse names should be unified and stored only in one instance."
+                            )
+                        existing_odoo_warehouse.save()
+                    else:
+                        odoo_repo.insert(
+                            key=OdooKeys.WAREHOUSES,
+                            entity=OdooWarehouse(
+                                odoo_id=warehouse["id"], warehouse_id=saved.id
+                            ),
+                        )
+                warehouse["saved_id"] = saved.id
+                warehouse["saved"] = saved
 
 
 # @lru_cache()

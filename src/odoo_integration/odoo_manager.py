@@ -618,6 +618,42 @@ class OdooManager:
             },
         }
 
+    def receive_delivery_options(self):
+        delivery_options = self._client.get_objects(
+            "delivery.carrier", i18n_fields=["name"]
+        )
+        result = []
+        for delivery_option in delivery_options:
+            delivery_option_dto = {
+                "id": delivery_option["id"],
+                "_remote_id": delivery_option["id"],
+                "name": delivery_option["name"],
+            }
+            i18n_fields = get_i18n_field_as_dict(delivery_option, "name")
+            delivery_option_dto.update(i18n_fields)
+            result.append(delivery_option_dto)
+        return {
+            "all_ids": self._client.get_all_object_ids(
+                "delivery.carrier", [("is_published", "=", True)]
+            )(),
+            "objects": result,
+        }
+
+    def receive_warehouses(self):
+        warehouses = self._client.get_objects("stock.warehouse", i18n_fields=["name"])
+        result = []
+        for warehouse in warehouses:
+            warehouse_dto = {
+                "id": warehouse["id"],
+                "_remote_id": warehouse["id"],
+                "name": warehouse["name"],
+            }
+            result.append(warehouse_dto)
+        return {
+            "all_ids": self._client.get_all_object_ids("stock.warehouse")(),
+            "objects": result,
+        }
+
 
 # @lru_cache()
 def get_odoo_provider(

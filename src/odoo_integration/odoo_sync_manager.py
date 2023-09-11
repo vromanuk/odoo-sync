@@ -34,8 +34,8 @@ class OdooSyncManager:
         logger.info("Start receiving products from Odoo")
         self.sync_products(full_sync=True)
 
-        # self.logger.info("Start receive order data from Odoo")
-        # self.receive_order_data()
+        logger.info("Start receiving order data from Odoo")
+        self.sync_warehouses()
 
         # last_successful_sync_date = None
         #
@@ -345,6 +345,23 @@ class OdooSyncManager:
             self.ordercast_manager.save_products(
                 categories, product_groups, attributes, products, odoo_repo=self.repo
             )
+
+    def sync_warehouses(self):
+        delivery_options = self.odoo_manager.receive_delivery_options()
+        logger.info(
+            f"Received {len(delivery_options['objects']) if delivery_options and 'objects' in delivery_options else 0} delivery options, start saving them."
+        )
+        if delivery_options:
+            self.ordercast_manager.save_delivery_option(
+                delivery_options, odoo_repo=self.repo
+            )
+
+        warehouses = self.odoo_manager.receive_warehouses()
+        logger.info(
+            f"Received {len(warehouses['objects']) if warehouses and 'objects' in warehouses else 0} warehouses, start saving them."
+        )
+        if warehouses:
+            self.ordercast_manager.save_warehouse(warehouses, odoo_repo=self.repo)
 
 
 @lru_cache()
