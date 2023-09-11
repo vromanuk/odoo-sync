@@ -11,6 +11,7 @@ from src.api import (
     CreateShippingAddressRequest,
     ListBillingAddressesRequest,
     ListShippingAddressesRequest,
+    CreateOrderRequest,
 )
 from src.api import (
     OrdercastApiValidationException,
@@ -131,6 +132,22 @@ class OrdercastApi:
         requests.post(
             url=f"{self.base_url}/product/",
             data=products,
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def get_orders(self, order_ids, from_date):
+        # TODO: introduce parameter passing
+        return requests.get(
+            url=f"{self.base_url}/order/",
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def create_order(self, request: CreateOrderRequest) -> None:
+        requests.post(
+            url=f"{self.base_url}/order/?order_status_enum={request.order_status_enum}",
+            data=request.model_dump(),
             headers=self._auth_headers,
         )
 

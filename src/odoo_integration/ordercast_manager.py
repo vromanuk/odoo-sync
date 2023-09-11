@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Annotated, Any, Optional
 
 import structlog
@@ -7,6 +8,7 @@ from src.api import (
     CreateShippingAddressRequest,
     ListBillingAddressesRequest,
     ListShippingAddressesRequest,
+    CreateOrderRequest,
 )
 from src.data import (
     OdooProductGroup,
@@ -14,6 +16,9 @@ from src.data import (
     OdooProduct,
     OdooDeliveryOption,
     OdooWarehouse,
+    OdooOrder,
+    InvoiceStatus,
+    OrderStatus,
 )
 from src.infrastructure import OrdercastApi, get_ordercast_api
 from .exceptions import OdooSyncException
@@ -26,7 +31,7 @@ from .helpers import (
     exists_in_all_ids,
     str_to_int,
 )
-from .odoo_repo import OdooRepo, OdooKeys
+from .odoo_repo import OdooRepo, RedisKeys
 from .validators import (
     validate_product_groups,
     validate_categories,
@@ -91,7 +96,7 @@ class OrdercastManager:
             user_dto = {"id": user.id, "name": user.name}
 
             # user_remote = UserExternal.objects.filter(user_id=user.id).first()
-            user_remote = odoo_repo.get(key=OdooKeys.USERS, entity_id=user.id)
+            user_remote = odoo_repo.get(key=RedisKeys.USERS, entity_id=user.id)
             if user_remote:
                 user_dto["_remote_id"] = user_remote.odoo_id
             # if user.erp_id:
@@ -201,7 +206,7 @@ class OrdercastManager:
             #     address_id=address_id
             # ).first()
             external_address = odoo_repo.get(
-                key=OdooKeys.ADDRESSES, entity_id=address_id
+                key=RedisKeys.ADDRESSES, entity_id=address_id
             )
             if external_address:
                 address_dto["_remote_id"] = external_address.odoo_id
@@ -242,7 +247,7 @@ class OrdercastManager:
             #     odoo_id=group["id"]
             # ).first()
             odoo_product_group = odoo_repo.get(
-                key=OdooKeys.PRODUCT_GROUPS, entity_id=group["id"]
+                key=RedisKeys.PRODUCT_GROUPS, entity_id=group["id"]
             )
             defaults["is_removed"] = False
             if odoo_product_group:
@@ -264,7 +269,7 @@ class OrdercastManager:
                 #     product_group=saved
                 # ).first()
                 existing_odoo_product_group = odoo_repo.get(
-                    key=OdooKeys.PRODUCT_GROUPS, entity_id=saved.id
+                    key=RedisKeys.PRODUCT_GROUPS, entity_id=saved.id
                 )
                 if existing_odoo_product_group:
                     if not exists_in_all_ids(
@@ -284,7 +289,7 @@ class OrdercastManager:
                     #     product_group_id=saved.id, odoo_id=group["id"]
                     # )
                     odoo_repo.insert(
-                        key=OdooKeys.PRODUCT_GROUPS,
+                        key=RedisKeys.PRODUCT_GROUPS,
                         entity=OdooProductGroup(
                             odoo_id=group["id"], product_group=saved.id
                         ),
@@ -348,7 +353,7 @@ class OrdercastManager:
                             defaults_data.update(i18n_fields)
                             # external_attribute_value = AttributeExternal.objects.filter(odoo_id=value["id"]).first()
                             external_attribute_value = odoo_repo.get(
-                                keys=OdooKeys.ATTRIBUTES, entity_id=value["id"]
+                                keys=RedisKeys.ATTRIBUTES, entity_id=value["id"]
                             )
                             if external_attribute_value:
                                 defaults_data["name"] = value["name"]
@@ -368,7 +373,7 @@ class OrdercastManager:
                                 # existing_external_object = AttributeExternal.objects.filter(
                                 #     attribute_id=saved.id).first()
                                 existing_odoo_attribute = odoo_repo.get(
-                                    key=OdooKeys.ATTRIBUTES, entity_id=saved.id
+                                    key=RedisKeys.ATTRIBUTES, entity_id=saved.id
                                 )
                                 if existing_odoo_attribute:
                                     if not exists_in_all_ids(
@@ -387,7 +392,7 @@ class OrdercastManager:
                                     # AttributeExternal.objects.update_or_create(attribute_id=saved.id,
                                     #                                            odoo_id=value["id"])
                                     odoo_repo.insert(
-                                        key=OdooKeys.ATTRIBUTES,
+                                        key=RedisKeys.ATTRIBUTES,
                                         entity=OdooAttribute(
                                             odoo_id=value["id"], attribute=saved.id
                                         ),
@@ -463,7 +468,7 @@ class OrdercastManager:
             defaults["is_removed"] = False
 
             # odoo_product = ProductExternal.objects.filter(odoo_id=remote_id).first()
-            odoo_product = odoo_repo.get(key=OdooKeys.PRODUCTS, entity_id=remote_id)
+            odoo_product = odoo_repo.get(key=RedisKeys.PRODUCTS, entity_id=remote_id)
             if odoo_product:
                 defaults["ref"] = ref
                 # saved_product, _ = Product.all_objects.update_or_create(id=odoo_product.product.id,
@@ -478,7 +483,7 @@ class OrdercastManager:
                 )
                 # existing_odoo_product = ProductExternal.objects.filter(product__id=saved_product.id).first()
                 existing_odoo_product = odoo_repo.get(
-                    key=OdooKeys.PRODUCTS, entity_id=saved_product.id
+                    key=RedisKeys.PRODUCTS, entity_id=saved_product.id
                 )
 
                 if existing_odoo_product:
@@ -495,7 +500,7 @@ class OrdercastManager:
                 else:
                     # ProductExternal.objects.update_or_create(product_id=saved_product.id, odoo_id=remote_id)
                     odoo_repo.insert(
-                        key=OdooKeys.PRODUCTS,
+                        key=RedisKeys.PRODUCTS,
                         entity=OdooProduct(odoo_id=remote_id, product=saved_product.id),
                     )
 
@@ -555,11 +560,9 @@ class OrdercastManager:
                                             attribute=attribute_value["saved"],
                                         )
                                         if "saved_product_attribute_ids" not in product:
-                                            product[
-                                                "saved_product_attribute_ids"
-                                            ] = list()
+                                            product["saved_product_attribute_ids"] = []
                                         if "saved_product_attributes" not in product:
-                                            product["saved_product_attributes"] = list()
+                                            product["saved_product_attributes"] = []
 
                                         product["saved_product_attribute_ids"].append(
                                             saved_product_attribute.id
@@ -702,7 +705,7 @@ class OrdercastManager:
         delivery_options = delivery_options_dict["objects"]
         if not delivery_options:
             logger.info(f"Deleting delivery options.")
-            delivery_option_ids = odoo_repo.get_many(key=OdooKeys.DELIVERY_OPTIONS)
+            delivery_option_ids = odoo_repo.get_list(key=RedisKeys.DELIVERY_OPTIONS)
 
             # TODO: HANDLE
             if delivery_option_ids:
@@ -736,7 +739,7 @@ class OrdercastManager:
                 # external_delivery_option = DeliveryOptionExternal.objects.filter(
                 #     odoo_id=delivery_option["id"]).first()
                 odoo_delivery_option = odoo_repo.get(
-                    key=OdooKeys.DELIVERY_OPTIONS, entity_id=delivery_option["id"]
+                    key=RedisKeys.DELIVERY_OPTIONS, entity_id=delivery_option["id"]
                 )
                 if odoo_delivery_option:
                     # saved, _ = DeliveryOption.objects.update_or_create(
@@ -774,7 +777,7 @@ class OrdercastManager:
                         # DeliveryOptionExternal.objects.update_or_create(delivery_option_id=saved.id,
                         #                                                 odoo_id=delivery_option["id"])
                         odoo_repo.insert(
-                            key=OdooKeys.DELIVERY_OPTIONS,
+                            key=RedisKeys.DELIVERY_OPTIONS,
                             entity=OdooDeliveryOption(
                                 odoo_id=delivery_option["id"], delivery_option=saved.id
                             ),
@@ -786,7 +789,7 @@ class OrdercastManager:
         warehouses = warehouses_dict["objects"]
         if not warehouses:
             logger.info(f"Deleting warehouses.")
-            warehouse_ids = odoo_repo.get_many(OdooKeys.WAREHOUSES)
+            warehouse_ids = odoo_repo.get_list(RedisKeys.WAREHOUSES)
             # TODO HANDLE
             if warehouse_ids:
                 pass
@@ -805,7 +808,7 @@ class OrdercastManager:
                 defaults_data.update(i18n_fields)
                 # odoo_warehouse = WarehouseExternal.objects.filter(odoo_id=warehouse["id"]).first()
                 odoo_warehouse = odoo_repo.get(
-                    OdooKeys.WAREHOUSES, entity_id=warehouse["id"]
+                    RedisKeys.WAREHOUSES, entity_id=warehouse["id"]
                 )
                 if odoo_warehouse:
                     # saved = Warehouse.objects.update_or_create(id=odoo_warehouse.warehouse.id,
@@ -817,7 +820,7 @@ class OrdercastManager:
                     saved = self.ordercast_api.create_warehouse()
 
                     existing_odoo_warehouse = odoo_repo.get(
-                        key=OdooKeys.WAREHOUSES, entity_id=saved.id
+                        key=RedisKeys.WAREHOUSES, entity_id=saved.id
                     )
 
                     if existing_odoo_warehouse:
@@ -834,13 +837,223 @@ class OrdercastManager:
                         existing_odoo_warehouse.save()
                     else:
                         odoo_repo.insert(
-                            key=OdooKeys.WAREHOUSES,
+                            key=RedisKeys.WAREHOUSES,
                             entity=OdooWarehouse(
                                 odoo_id=warehouse["id"], warehouse_id=saved.id
                             ),
                         )
                 warehouse["saved_id"] = saved.id
                 warehouse["saved"] = saved
+
+    def get_orders(self, order_ids, odoo_repo: OdooRepo, from_date=None):
+        orders = self.ordercast_api.get_orders(order_ids, from_date)
+
+        result = []
+        for order in orders:
+            order_dto = {
+                "id": order.id,
+                "name": f"OC{str(order.id).zfill(5)}",
+                "status": order.status,
+            }
+            billing_address_dto = self.get_address(
+                order.billing_info.address, odoo_repo=odoo_repo
+            )
+            shipping_address_dto = self.get_address(order.address, odoo_repo=odoo_repo)
+            if shipping_address_dto:
+                order_dto["shipping_address"] = shipping_address_dto
+            if billing_address_dto:
+                billing_address_dto["name"] = order.billing_info.enterprise_name
+                billing_address_dto["vat"] = order.billing_info.vat
+                order_dto["billing_address"] = billing_address_dto
+            if order.delivery_option:
+                delivery_option = order.delivery_option
+                delivery_option_dto = {
+                    "id": delivery_option.id,
+                    "name": delivery_option.name,
+                }
+                odoo_delivery_option = odoo_repo.get(
+                    key=RedisKeys.DELIVERY_OPTIONS, entity_id=delivery_option.id
+                )
+                if odoo_delivery_option:
+                    delivery_option_dto["_remote_id"] = odoo_delivery_option.odoo_id
+
+                order_dto["delivery_option"] = delivery_option_dto
+            if order.warehouse:
+                warehouse = order.warehouse
+                warehouse_dto = {"id": warehouse.id, "name": warehouse.name}
+                odoo_warehouse = odoo_repo.get(
+                    key=RedisKeys.WAREHOUSES, entity_id=warehouse.id
+                )
+                if odoo_warehouse:
+                    warehouse_dto["_remote_id"] = odoo_warehouse.odoo_id
+                else:
+                    logger.info(
+                        f"The warehouse name '{warehouse.name}' has no remote id. Please sync it first with Odoo."
+                    )
+                order_dto["warehouse"] = warehouse_dto
+
+            odoo_order = odoo_repo.get(key=RedisKeys.ORDERS, entity_id=order.id)
+            if odoo_order:
+                order_dto["_remote_id"] = odoo_order.odoo_id
+            odoo_user = odoo_repo.get(key=RedisKeys.USERS, entity_id=order.user)
+            if odoo_user:
+                order_dto["user_remote_id"] = odoo_user.odoo_id
+            if order.invoice_number:
+                order_dto["invoice_number"] = order.invoice_number
+            if order.note:
+                order_dto["note"] = order.note
+            if order.basket:
+                basket = order.basket
+                basket_dto = {
+                    "id": basket.id,
+                    "total": basket.total,
+                    "grand_total": basket.grand_total,
+                    "total_taxes": basket.total_taxes,
+                    "vat_percent": basket.vat_percent,
+                }
+                order_dto["basket"] = basket_dto
+                if basket.basket_products:
+                    basket_products = []
+                    basket_dto["basket_products"] = basket_products
+                    for basket_product in basket.basket_products.all():
+                        basket_product_dto = {
+                            "id": basket_product.id,
+                            "price": basket_product.price,
+                            "quantity": basket_product.quantity,
+                            "total_price": basket_product.total,
+                            "total_quantity": basket_product.total_quantity,
+                        }
+                        if basket_product.final_quantity:
+                            basket_product_dto[
+                                "final_quantity"
+                            ] = basket_product.final_quantity
+
+                        if basket_product.product:
+                            product = basket_product.product
+                            product_dto = {
+                                "id": product.id,
+                                "ref": product.ref,
+                                "name": product.name,
+                            }
+                            odoo_product = odoo_repo.get(
+                                key=RedisKeys.PRODUCTS, entity_id=product.id
+                            )
+                            if odoo_product:
+                                product_dto["_remote_id"] = odoo_product.odoo_id
+                            basket_product_dto["product"] = product_dto
+                        odoo_basket_product = odoo_repo.get(
+                            key=RedisKeys.BASKET_PRODUCT, entity_id=basket_product.id
+                        )
+                        if odoo_basket_product:
+                            basket_product_dto[
+                                "_remote_id"
+                            ] = odoo_basket_product.odoo_id
+                        basket_products.append(basket_product_dto)
+            result.append(order_dto)
+
+        return result
+
+    def sync_orders(self, orders, odoo_repo: OdooRepo) -> None:
+        for order in orders:
+            odoo_order = odoo_repo.get(key=RedisKeys.ORDERS, entity_id=order["id"])
+            if odoo_order:
+                odoo_order.odoo_order_status = order["status"]
+                odoo_order.odoo_invoice_status = order["invoice_status"]
+
+                # todo: add logic of updating products amount, out of stock it should be investigated.
+
+                existing_order = odoo_order.order
+                if "invoice_file_data" in order:
+                    # self.save_file(order['invoice_file_name'], order['invoice_file_data'], existing_order.invoice)
+                    logger.info(
+                        f"Invoice file {order['invoice_file_name']} added for order {existing_order.id}."
+                    )
+                elif existing_order.invoice:
+                    logger.info(
+                        f"Invoice file {existing_order.invoice.url.split('/')[-1] if existing_order.invoice and existing_order.invoice.url else ''} removed from order {existing_order.id}."
+                    )
+                    # self.delete_file(existing_order.invoice)
+
+                if "note" in order:
+                    existing_order.note = order["note"]
+
+                odoo_repo.insert(
+                    key=RedisKeys.ORDERS,
+                    entity=OdooOrder(
+                        odoo_id=existing_order.odoo_id,
+                        order=existing_order.order,
+                        sync_date=datetime.now(timezone.utc),
+                        odoo_order_status=existing_order.odoo_order_status,
+                        odoo_invoice_status=existing_order.odoo_invoice_status,
+                    ),
+                )
+
+                self.ordercast_api.create_order(
+                    CreateOrderRequest(
+                        order_status_enum=existing_order.odoo_order_status,
+                        merchant_id=None,
+                        price_rate_id=None,
+                        external_id=existing_order.odoo_id,
+                    )
+                )
+                self.update_order_status(existing_order, odoo_order, order)
+            else:
+                logger.error(
+                    f"Address with remote_id={order['id']} not exists in the system, please run sync task first."
+                )
+
+    def update_order_status(self, existing_order, external_order, order):
+        # TODO: fix
+        try:
+            if (
+                external_order.odoo_invoice_status == InvoiceStatus.INV_INVOICED_STATUS
+                and existing_order.status
+                not in [
+                    OrderStatus.PROCESSED_STATUS,
+                    OrderStatus.PENDING_PAYMENT_STATUS,
+                    OrderStatus.CANCELLED_BY_ADMIN_STATUS,
+                ]
+            ):
+                logger.info(
+                    f"Order '{order['name']}' has Odoo oder status: '{external_order.odoo_order_status}' and invoice status: '{external_order.odoo_invoice_status}', updating to 'Processed'."
+                )
+                if existing_order.invoice:
+                    url = utils.get_invoice_full_url(existing_order.invoice)
+                    existing_order.processed(url)
+                else:
+                    logger.warn(
+                        f"Order '{order['name']}' has no invoice file, so changing status to 'Processed' ignored."
+                    )
+            elif (
+                external_order.odoo_order_status == OrderStatus.DONE_STATUS
+                and existing_order.status != OrderStatus.COMPLETED_STATUS
+            ):
+                logger.info(
+                    f"Order '{order['name']}' has Odoo oder status: '{external_order.odoo_order_status}' and invoice status: '{external_order.odoo_invoice_status}', updating to 'Completed'."
+                )
+                existing_order.complete()
+            elif (
+                external_order.odoo_order_status == OrderStatus.CANCEL_STATUS
+                and existing_order.status != OrderStatus.CANCELLED_BY_ADMIN_STATUS
+            ):
+                logger.info(
+                    f"Order '{order['name']}' has Odoo oder status: '{external_order.odoo_order_status}' and invoice status: '{external_order.odoo_invoice_status}', updating to 'Cancelled'."
+                )
+                if existing_order.status in [
+                    OrderStatus.SUBMITTED_STATUS,
+                    OrderStatus.IN_PROGRESS_STATUS,
+                ]:
+                    existing_order.cancel(
+                        existing_order.operator
+                    )  # todo: add original operator or admin from local user list. it is imposible now to find out the original canceller user
+                else:
+                    logger.warn(
+                        f"Order '{order['name']}' can not be cancelled, since it has '{existing_order.status}' status and only orders with '{OrderStatus.SUBMITTED_STATUS}' or '{OrderStatus.IN_PROGRESS_STATUS}' statuses permitted to cancel."
+                    )
+            existing_order.save()
+        except Exception as exc:
+            logger.error(f"Error during updating order status locally.")
+            raise exc
 
 
 # @lru_cache()

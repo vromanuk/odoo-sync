@@ -27,3 +27,13 @@ class ListBillingAddressesRequest(BaseModel):
 
 class ListShippingAddressesRequest(BaseModel):
     merchant_id: PositiveInt
+
+
+class CreateOrderRequest(BaseModel):
+    order_status_enum: PositiveInt
+    merchant_id: PositiveInt
+    price_rate_id: PositiveInt
+    external_id: PositiveInt
+
+    class Config:
+        exclude = {"order_status_enum"}

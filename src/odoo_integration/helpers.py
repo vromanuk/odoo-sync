@@ -110,3 +110,9 @@ def str_to_float(data, default=None):
 def str_to_int(data, default=None):
     num = str_to_float(data, default)
     return int(num) if num is not None else default
+
+
+def check_remote_id(dto):
+    if "_remote_id" not in dto:
+        msg = f"Not remote id found for {dto['id']}. Please check it."
+        raise SyntaxError(msg)

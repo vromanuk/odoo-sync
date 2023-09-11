@@ -3,6 +3,7 @@ from .ordercast_api_requests import (
     CreateShippingAddressRequest,
     ListBillingAddressesRequest,
     ListShippingAddressesRequest,
+    CreateOrderRequest,
 )
 
 __all__ = (
@@ -10,4 +11,5 @@ __all__ = (
     "BulkSignUpByErpIdRequest",
     "ListShippingAddressesRequest",
     "ListBillingAddressesRequest",
+    "CreateOrderRequest",
 )

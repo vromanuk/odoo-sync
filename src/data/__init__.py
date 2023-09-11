@@ -1,4 +1,10 @@
-from .enums import UserStatus, PartnerType, PartnerAddressType
+from .enums import (
+    UserStatus,
+    PartnerType,
+    PartnerAddressType,
+    OrderStatus,
+    InvoiceStatus,
+)
 from .models import (
     OdooUser,
     OdooAddress,
@@ -8,6 +14,8 @@ from .models import (
     OdooProduct,
     OdooDeliveryOption,
     OdooWarehouse,
+    OdooOrder,
+    OdooBasketProduct,
 )
 from .typings import OdooEntity
 
@@ -22,6 +30,10 @@ __all__ = (
     "OdooDeliveryOption",
     "OdooWarehouse",
     "OdooProduct",
+    "OdooBasketProduct",
+    "OdooOrder",
     "PartnerType",
     "PartnerAddressType",
+    "OrderStatus",
+    "InvoiceStatus",
 )

@@ -5,6 +5,7 @@ from .requests import (
     CreateShippingAddressRequest,
     ListBillingAddressesRequest,
     ListShippingAddressesRequest,
+    CreateOrderRequest,
 )
 
 __all__ = (
@@ -15,4 +16,5 @@ __all__ = (
     "CreateShippingAddressRequest",
     "ListShippingAddressesRequest",
     "ListBillingAddressesRequest",
+    "CreateOrderRequest",
 )

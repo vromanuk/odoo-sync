@@ -55,6 +55,9 @@ class RedisClient:
     def ping(self):
         return self._client.ping()
 
+    def length(self, key: str):
+        return self._client.scard(key)
+
 
 # @lru_cache()
 def get_redis_client(

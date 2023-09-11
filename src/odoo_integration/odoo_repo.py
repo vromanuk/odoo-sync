@@ -13,11 +13,13 @@ from src.data import (
     OdooProduct,
     OdooDeliveryOption,
     OdooWarehouse,
+    OdooOrder,
+    OdooBasketProduct,
 )
 from src.infrastructure import RedisClient, get_redis_client
 
 
-class OdooKeys(str, enum.Enum):
+class RedisKeys(str, enum.Enum):
     USERS = "users"
     ADDRESSES = "addresses"
     PRODUCT_GROUPS = "product_groups"
@@ -25,6 +27,11 @@ class OdooKeys(str, enum.Enum):
     PRODUCTS = "products"
     DELIVERY_OPTIONS = "delivery_options"
     WAREHOUSES = "warehouses"
+    ORDERS = "orders"
+    BASKET_PRODUCT = "basket_product"
+
+    LAST_SUCCESSFUL_ORDERCAST_SYNC_DATE = "ordercast_sync_date"
+    LAST_SUCCESSFUL_ODOO_SYNC_DATE = "odoo_sync_date"
 
 
 class OdooRepo:
@@ -33,34 +40,42 @@ class OdooRepo:
         self._prefix = prefix
 
         self._schema = {
-            OdooKeys.USERS: {"key": f"{self._prefix}:odoo:users", "model": OdooUser},
-            OdooKeys.ADDRESSES: {
+            RedisKeys.USERS: {"key": f"{self._prefix}:odoo:users", "model": OdooUser},
+            RedisKeys.ADDRESSES: {
                 "key": f"{self._prefix}:odoo:addresses",
                 "model": OdooAddress,
             },
-            OdooKeys.PRODUCT_GROUPS: {
+            RedisKeys.PRODUCT_GROUPS: {
                 "key": f"{self._prefix}:odoo:product_groups",
                 "model": OdooProductGroup,
             },
-            OdooKeys.ATTRIBUTES: {
+            RedisKeys.ATTRIBUTES: {
                 "key": f"{self._prefix}:odoo:attributes",
                 "model": OdooAttribute,
             },
-            OdooKeys.PRODUCTS: {
+            RedisKeys.PRODUCTS: {
                 "key": f"{self._prefix}:odoo:products",
                 "model": OdooProduct,
             },
-            OdooKeys.DELIVERY_OPTIONS: {
+            RedisKeys.DELIVERY_OPTIONS: {
                 "key": f"{self._prefix}:odoo:delivery_options",
                 "model": OdooDeliveryOption,
             },
-            OdooKeys.WAREHOUSES: {
+            RedisKeys.WAREHOUSES: {
                 "key": f"{self._prefix}:odoo:warehouses",
                 "model": OdooWarehouse,
             },
+            RedisKeys.ORDERS: {
+                "key": f"{self._prefix}:odoo:orders",
+                "model": OdooOrder,
+            },
+            RedisKeys.BASKET_PRODUCT: {
+                "key": f"{self._prefix}:odoo:basket_product",
+                "model": OdooBasketProduct,
+            },
         }
 
-    def get_many(self, key: OdooKeys) -> list[OdooEntity]:
+    def get_list(self, key: RedisKeys) -> list[OdooEntity]:
         entity_schema = self._schema.get(key)
         entity_key = entity_schema.get("key")
         entity_model = entity_schema.get("model")
@@ -70,7 +85,7 @@ class OdooRepo:
             for entity_json in self._client.get_many(entity_key)
         ]
 
-    def get(self, key: OdooKeys, entity_id: int) -> Optional[OdooEntity]:
+    def get(self, key: RedisKeys, entity_id: int) -> Optional[OdooEntity]:
         entity_schema = self._schema.get(key)
         entity_key = entity_schema.get("key")
         entity_model = entity_schema.get("model")
@@ -78,13 +93,13 @@ class OdooRepo:
         entity_json = self._client.get(f"{entity_key}:{entity_id}")
         return entity_model.from_json(entity_json) if entity_json else None
 
-    def insert_many(self, key: OdooKeys, entities: list[OdooEntity]) -> None:
+    def insert_many(self, key: RedisKeys, entities: list[OdooEntity]) -> None:
         entity_schema = self._schema.get(key)
         entity_key = entity_schema.get("key")
 
         self._client.insert_many(entities, key=entity_key)
 
-    def insert(self, key: OdooKeys, entity: OdooEntity) -> None:
+    def insert(self, key: RedisKeys, entity: OdooEntity) -> None:
         entity_schema = self._schema.get(key)
         entity_key = entity_schema.get("key")
 
@@ -94,11 +109,17 @@ class OdooRepo:
             entity_key=f"{entity_key}:{entity.odoo_id}",
         )
 
-    def remove(self, key: OdooKeys, entity_id: int) -> None:
+    def remove(self, key: RedisKeys, entity_id: int) -> None:
         entity_schema = self._schema.get(key)
         entity_key = entity_schema.get("key")
 
         self._client.remove(f"{entity_key}:{entity_id}")
+
+    def get_key(self, key: RedisKeys):
+        return self._client.get(f"{self._prefix}:{key}")
+
+    def get_len(self, key: RedisKeys):
+        return self._client.length(f"{self._prefix}:{key}")
 
 
 # @lru_cache()

@@ -5,10 +5,19 @@ import structlog
 from fastapi import Depends
 from odoo_rpc_client.connection.jsonrpc import JSONRPCError
 
-from src.data import OdooUser, OdooAddress, PartnerType, PartnerAddressType
+from src.data import (
+    OdooUser,
+    OdooAddress,
+    PartnerType,
+    PartnerAddressType,
+    OrderStatus,
+    OdooOrder,
+    OdooBasketProduct,
+)
 from src.infrastructure import OdooClient, get_odoo_client
-from .helpers import is_empty, is_not_empty, get_i18n_field_as_dict
-from .odoo_repo import OdooRepo, get_odoo_repo, OdooKeys
+from .exceptions import OdooSyncException
+from .helpers import is_empty, is_not_empty, get_i18n_field_as_dict, check_remote_id
+from .odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
 from .partner import Partner
 
 logger = structlog.getLogger(__name__)
@@ -174,7 +183,7 @@ class OdooManager:
             #     user_id=user["id"], defaults={"odoo_id": remote_id, "is_removed": False}
             # )
             self._repo.insert(
-                key=OdooKeys.USERS,
+                key=RedisKeys.USERS,
                 entity=OdooUser(
                     odoo_id=remote_id,
                     sync_date=datetime.now(timezone.utc),
@@ -321,7 +330,7 @@ class OdooManager:
                 )
                 if remote_id:
                     # AddressExternal.all_objects.filter(odoo_id=remote_id).delete()
-                    self._repo.remove(key=OdooKeys.ADDRESSES, entity_id=remote_id)
+                    self._repo.remove(key=RedisKeys.ADDRESSES, entity_id=remote_id)
 
         if create_remote_partner:
             remote_id = remote_partner_obj.create(send_partner)
@@ -332,7 +341,7 @@ class OdooManager:
         #     address_id=partner["id"], odoo_id=remote_id, defaults={"is_removed": False}
         # )
         self._repo.insert(
-            key=OdooKeys.ADDRESSES,
+            key=RedisKeys.ADDRESSES,
             entity=OdooAddress(
                 odoo_id=remote_id,
                 sync_date=datetime.now(timezone.utc),
@@ -596,7 +605,7 @@ class OdooManager:
                     for attribute in result:
                         if "id" in attribute and attribute["id"] == attribute_id[0]:
                             if "values" not in attribute:
-                                attribute["values"] = list()
+                                attribute["values"] = []
                             attribute_value_dto = {
                                 "id": attribute_value["id"],
                                 "name": attribute_value["name"],
@@ -653,6 +662,308 @@ class OdooManager:
             "all_ids": self._client.get_all_object_ids("stock.warehouse")(),
             "objects": result,
         }
+
+    def sync_orders(self, orders) -> None:
+        if not orders:
+            return
+        remote_orders_obj = self._client["sale.order"]
+        remote_orders_line_obj = self._client["sale.order.line"]
+        for order_dto in orders:
+            send_order = {
+                "order_line": [],
+            }
+
+            billing_address_dto = order_dto.get("billing_address")
+            shipping_address_dto = order_dto.get("shipping_address")
+            delivery_option_dto = order_dto.get("delivery_option")
+            warehouse_dto = (
+                order_dto["warehouse"]
+                if "warehouse" in order_dto and order_dto["warehouse"]
+                else None
+            )
+            basket_dto = order_dto["basket"]
+
+            if is_not_empty(order_dto, "user_remote_id"):
+                send_order["partner_id"] = order_dto["user_remote_id"]
+
+            # default type
+            if billing_address_dto:
+                billing_address_dto["type"] = PartnerAddressType.INVOICE.value
+                self.sync_partner(billing_address_dto)
+                check_remote_id(billing_address_dto)
+                send_order.update(
+                    {
+                        # "partner_id": billing_address_dto["_remote_id"],
+                        "partner_invoice_id": billing_address_dto["_remote_id"],
+                    }
+                )
+
+            if shipping_address_dto:
+                shipping_address_dto["type"] = PartnerAddressType.DELIVERY.value
+                self.sync_partner(shipping_address_dto)
+                check_remote_id(shipping_address_dto)
+                send_order.update(
+                    {
+                        # "partner_id": shipping_address_dto["_remote_id"],
+                        "partner_shipping_id": shipping_address_dto["_remote_id"],
+                    }
+                )
+
+            if delivery_option_dto:
+                if "_remote_id" in delivery_option_dto:
+                    send_order["carrier_id"] = delivery_option_dto["_remote_id"]
+
+            send_order.update(
+                {
+                    "reference": order_dto["name"],
+                    "name": order_dto["name"],
+                    "amount_tax": basket_dto["total_taxes"],
+                    "amount_total": basket_dto["grand_total"],
+                    "amount_untaxed": basket_dto["total"],
+                }
+            )
+
+            if "note" in order_dto:
+                send_order["note"] = order_dto["note"]
+
+            if warehouse_dto and "_remote_id" in warehouse_dto:
+                send_order["warehouse_id"] = warehouse_dto["_remote_id"]
+            else:
+                logger.info(
+                    f"Sending order id '{order_dto['id']}' has no order warehouse. Please make full sync with Odoo first."
+                )
+            create_remote_order = True
+            remote_order_id = None
+            odoo_order = self._repo.get(key=RedisKeys.ORDERS, entity_id=order_dto["id"])
+            if "_remote_id" in order_dto:
+                remote_order_id = order_dto["_remote_id"]
+                existing_remote_orders = remote_orders_obj.read(ids=[remote_order_id])
+                if existing_remote_orders and len(existing_remote_orders) > 0:
+                    existing_remote_order = existing_remote_orders[0]
+                    if (
+                        existing_remote_order["state"] != OrderStatus.CANCEL_STATUS
+                        and order_dto["status"] == OrderStatus.CANCELLED_BY_ADMIN_STATUS
+                    ):
+                        send_order["state"] = OrderStatus.CANCEL_STATUS
+                    remote_orders_obj.write(remote_order_id, send_order)
+                    create_remote_order = False
+
+            if create_remote_order:
+                send_order["state"] = OrderStatus.SALE_STATUS
+                remote_order_id = remote_orders_obj.create(send_order)
+                order_dto["_remote_id"] = remote_order_id
+            if remote_order_id:
+                existing_remote_orders = remote_orders_obj.read(ids=[remote_order_id])
+                defaults = {}
+                if existing_remote_orders and len(existing_remote_orders) > 0:
+                    existing_remote_order = existing_remote_orders[0]
+                    defaults["odoo_order_status"] = existing_remote_order["state"]
+                    defaults["odoo_invoice_status"] = existing_remote_order[
+                        "invoice_status"
+                    ]
+                if odoo_order:
+                    defaults["order_id"] = order_dto["id"]
+                    defaults["odoo_id"] = remote_order_id
+                    self._repo.insert(
+                        key=RedisKeys.ORDERS,
+                        entity=OdooOrder(
+                            odoo_id=remote_order_id,
+                            order=odoo_order.id,
+                            odoo_order_status=defaults["odoo_order_status"],
+                            odoo_invoice_status=defaults["odoo_invoice_status"],
+                        ),
+                    )
+                else:
+                    self._repo.insert(
+                        key=RedisKeys.ORDERS,
+                        entity=OdooOrder(
+                            odoo_id=remote_order_id,
+                            order=order_dto["id"],
+                            odoo_order_status=defaults["odoo_order_status"],
+                            odoo_invoice_status=defaults["odoo_invoice_status"],
+                        ),
+                    )
+            if "basket_products" in basket_dto:
+                for basket_product in basket_dto["basket_products"]:
+                    send_order_line = {
+                        "order_id": remote_order_id,
+                        "price_unit": basket_product["price"],
+                        "product_uom_qty": basket_product["quantity"],
+                        "price_total": basket_product["total_price"],
+                    }
+
+                    if "product" in basket_product:
+                        product = basket_product["product"]
+                        if "_remote_id" in product:
+                            send_order_line["product_id"] = product[
+                                "_remote_id"
+                            ]  # not id
+
+                        send_order_line["name"] = product["name"]
+                    if not create_remote_order and "_remote_id" in basket_product:
+                        remote_order_sale_id = basket_product["_remote_id"]
+                        remote_orders_line_obj.write(
+                            remote_order_sale_id, send_order_line
+                        )
+                    else:
+                        remote_order_sale_id = remote_orders_line_obj.create(
+                            send_order_line
+                        )
+                        basket_product["_remote_id"] = remote_order_sale_id
+                    odoo_basket_product = self._repo.get(
+                        key=RedisKeys.BASKET_PRODUCT, entity_id=basket_product["id"]
+                    )
+                    if odoo_basket_product:
+                        self._repo.insert(
+                            key=RedisKeys.BASKET_PRODUCT,
+                            entity=OdooBasketProduct(
+                                odoo_id=remote_order_sale_id,
+                                basket_product=basket_product["id"],
+                            ),
+                        )
+                    else:
+                        self._repo.insert(
+                            key=RedisKeys.BASKET_PRODUCT,
+                            entity=OdooBasketProduct(
+                                odoo_id=remote_order_sale_id,
+                                basket_product=basket_product["id"],
+                            ),
+                        )
+
+    def receive_orders(self, from_date=None):
+        if not self._repo.get_len(RedisKeys.ORDERS):
+            logger.info(
+                "There are no order were send to Odoo, seems no orders created yet.",
+                "INFO",
+            )
+            return None
+
+        orders = self.get_remote_updated_objects("sale.order", OdooOrder, from_date)
+
+        # TODO: Fix
+        # orders_invoice_attach_pending = OrderExternal.objects.filter(odoo_order_status__exact=OrderExternal.SALE_STATUS,
+        #                                                              odoo_invoice_status__exact=OrderExternal.INV_INVOICED_STATUS).exclude(
+        #     order__status__in=[Order.PROCESSED_STATUS, Order.PENDING_PAYMENT_STATUS]).values_list('odoo_id', flat=True)
+        orders_invoice_attach_pending = []
+        if orders_invoice_attach_pending:
+            status_check_orders = self._client.get_objects(
+                "sale.order", [("id", "in", [i for i in orders_invoice_attach_pending])]
+            )
+            if status_check_orders:
+                current_order_ids = []
+                if orders:
+                    current_order_ids = [o["id"] for o in orders]
+                for sto in status_check_orders:
+                    if sto["id"] not in current_order_ids:
+                        orders.append(sto)
+
+        remote_orders_line_obj = self._client["sale.order.line"]
+
+        result = []
+        for order in orders:
+            order_dto = {
+                "id": order["id"],
+                "_remote_id": order["id"],
+                "name": order["reference"],
+                "user_id": self._client.get_object_id(order["partner_id"]),
+                "status": order["state"],
+                "invoice_status": order["invoice_status"],
+                "partner_id": self._client.get_object_id(order["partner_id"]),
+                "billing_address": self._client.get_object_id(
+                    order["partner_invoice_id"]
+                ),
+                "shipping_address": self._client.get_object_id(
+                    order["partner_shipping_id"]
+                ),
+                "total_taxes": order["amount_tax"],
+                "grand_total": order["amount_total"],
+            }
+
+            if "note" in order:
+                order_dto["note"] = order["note"]
+
+            order_dto["delivery_date"] = order["commitment_date"]
+            order_dto["total"] = order["amount_untaxed"]
+            if "invoice_ids" in order and len(order["invoice_ids"]) > 0:
+                order_dto["invoice_ids"] = order["invoice_ids"]
+                attachment_ids = self._client["account.move"].search_read(
+                    [("id", "in", order["invoice_ids"])],
+                    fields=["id", "name", "message_main_attachment_id"],
+                )
+                if attachment_ids and len(attachment_ids) > 0:
+                    attachment_id = attachment_ids[0]
+                    if (
+                        attachment_id
+                        and "message_main_attachment_id" in attachment_id
+                        and attachment_id["message_main_attachment_id"]
+                        and len(attachment_id["message_main_attachment_id"]) > 0
+                    ):
+                        invoice_file_id = attachment_id["message_main_attachment_id"][0]
+                        invoice_file_name = attachment_id["message_main_attachment_id"][
+                            1
+                        ]
+                        attachment = self._client["ir.attachment"].search_read(
+                            [("id", "=", invoice_file_id)]
+                        )
+                        if attachment and len(attachment) > 0:
+                            attachment = attachment[0]
+                            if (
+                                "datas" in attachment
+                                and attachment["datas"]
+                                and len(attachment["datas"]) > 0
+                            ):
+                                invoice_file_data = attachment["datas"]
+                                order_dto["invoice_file_data"] = invoice_file_data
+                                order_dto["invoice_file_name"] = invoice_file_name
+
+            # order_dto["delivery_option"] = order_dto["carrier_id"]
+            if "warehouse_id" in order:
+                order_dto["warehouse"] = self._client.get_object_id(
+                    order["warehouse_id"]
+                )
+            # order_dto["basket"] = order_dto["amount_untaxed"]
+
+            order_lines = remote_orders_line_obj.search_read(
+                [("order_id", "=", order["id"])]
+            )
+            # default type
+            # billing_address_dto['type'] = 'contact'
+            # shipping_address_dto['type'] = 'contact'
+            order_line_dtos = []
+            if order_lines:
+                for order_line in order_lines:
+                    order_line_dto = {
+                        "order_id": self._client.get_object_id(order_line["order_id"]),
+                        "price": order_line["price_unit"],
+                        "quantity": order_line["product_uom_qty"],
+                        "total_price": order_line["price_total"],
+                    }
+                    if "product_id" in order_line:
+                        product_id = self._client.get_object_id(
+                            order_line["product_id"]
+                        )
+                        if product_id:
+                            odoo_product = self._repo.get(
+                                key=RedisKeys.PRODUCTS, entity_id=product_id
+                            )
+                            if odoo_product:
+                                product = odoo_product.product
+                                order_line_dto["product_id"] = product.id
+                                order_line_dto["name"] = product.name
+                            else:
+                                msg = f"Odoo product for remote_id = {product_id} not found. Please sync products first to make this working properly."
+                                logger.error(msg)
+                                raise OdooSyncException(msg)
+                            order_line_dto["_remote_product_id"] = product_id  # not id
+                        else:
+                            logger.warn(
+                                f"Order '{order_dto['name']}' has item '{(order_line['display_type'] + '/' if 'display_type' in order_line else '') + (order_line['name'] if 'name' in order_line else '')}' which is ignored."
+                            )
+                    order_line_dtos.append(order_line_dto)
+                order_dto["order_lines"] = order_line_dtos
+            result.append(order_dto)
+
+        return result
 
 
 # @lru_cache()

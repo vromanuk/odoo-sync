@@ -9,7 +9,7 @@ from fastapi import Depends
 from src.data import UserStatus, OdooUser, OdooAddress, OdooProductGroup, OdooProduct
 from .helpers import is_empty, is_not_empty, has_objects
 from .odoo_manager import OdooManager, get_odoo_provider
-from .odoo_repo import OdooRepo, get_odoo_repo, OdooKeys
+from .odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
 from .ordercast_manager import OrdercastManager, get_ordercast_manager
 from .partner import validate_partners
 
@@ -37,18 +37,14 @@ class OdooSyncManager:
         logger.info("Start receiving order data from Odoo")
         self.sync_warehouses()
 
-        # last_successful_sync_date = None
-        #
-        # last_successful_sync = ProductSync.objects.filter(type=ProductSync.SYNC_TYPE_ODOO_SYNC,
-        #                                                   state=ProductSync.COMPLETED).order_by("updated_at").last()
-        # if last_successful_sync:
-        #     last_successful_sync_date = last_successful_sync.updated_at
-        # last_receive_date = OrderExternal.objects.last_sync_date()
-        #
-        # self.logger.info("Start sync orders with Odoo")
-        # self.send_orders(from_date=last_successful_sync_date)
-        # self.receive_orders(from_date=last_receive_date)
-        # self.check_deletion()
+        logger.info("Start sync orders with Odoo")
+        self.sync_orders_with_odoo(
+            from_date=self.repo.get_key(RedisKeys.LAST_SUCCESSFUL_ORDERCAST_SYNC_DATE)
+        )
+        self.sync_orders_with_ordercast(
+            from_date=self.repo.get_key(RedisKeys.LAST_SUCCESSFUL_ODOO_SYNC_DATE)
+        )
+        self.check_deletion()
 
     def sync_users(self):
         logger.info("Started syncing user's data with Odoo.")
@@ -56,7 +52,7 @@ class OdooSyncManager:
         self.sync_users_to_odoo()
 
     def sync_users_from_odoo(self):
-        users = self.repo.get_many(key=OdooKeys.USERS)
+        users = self.repo.get_list(key=RedisKeys.USERS)
         partners = validate_partners(
             self.odoo_manager.receive_partner_users(
                 exclude_user_ids=[p.odoo_id for p in users]
@@ -70,7 +66,7 @@ class OdooSyncManager:
             # if 'email' in partner and partner['email']:
             if partner.email:
                 # external_user = UserExternal.all_objects.filter(odoo_id=partner["id"]).first()
-                odoo_user = self.repo.get(key=OdooKeys.USERS, entity_id=partner.id)
+                odoo_user = self.repo.get(key=RedisKeys.USERS, entity_id=partner.id)
                 if not odoo_user:
                     email = partner["email"]
                     # exists_by_email = User.all_objects.filter(email=email).first()
@@ -81,21 +77,22 @@ class OdooSyncManager:
                         )
                         # existing_external_object = UserExternal.all_objects.filter(user_id=exists_by_email.id).first()
                         existing_odoo_user = self.repo.get(
-                            key=OdooKeys.USERS, entity_id=ordercast_partner.id
+                            key=RedisKeys.USERS, entity_id=ordercast_partner.id
                         )
                         if existing_odoo_user:
                             logger.warning(
                                 f"This user already mapped to Odoo id: {existing_odoo_user.odoo_id}, but this user come with id: {partner['id']}."
                             )
                             self.repo.remove(
-                                key=OdooKeys.USERS, entity_id=existing_odoo_user.odoo_id
+                                key=RedisKeys.USERS,
+                                entity_id=existing_odoo_user.odoo_id,
                             )
                             # existing_external_object.is_removed = False
                             # existing_external_object.save()
                         else:
                             # UserExternal.all_objects.update_or_create(user_id=exists_by_email.id, odoo_id=partner["id"])
                             self.repo.insert(
-                                key=OdooKeys.USERS,
+                                key=RedisKeys.USERS,
                                 entity=OdooUser(
                                     odoo_id=partner["id"],
                                     sync_date=datetime.now(timezone.utc),
@@ -122,7 +119,7 @@ class OdooSyncManager:
                         # UserExternal.all_objects.update_or_create(user_id=saved.id, odoo_id=partner["id"],
                         #                                           defaults={'is_removed': False})
                         self.repo.insert(
-                            key=OdooKeys.USERS,
+                            key=RedisKeys.USERS,
                             entity=OdooUser(
                                 odoo_id=partner["id"],
                                 sync_date=datetime.now(timezone.utc),
@@ -244,7 +241,7 @@ class OdooSyncManager:
             )
             # AddressExternal.objects.update_or_create(address_id=saved.id, odoo_id=address['id'])
             self.repo.insert(
-                key=OdooKeys.ADDRESSES,
+                key=RedisKeys.ADDRESSES,
                 entity=OdooAddress(
                     odoo_id=address["id"],
                     sync_date=datetime.now(timezone.utc),
@@ -362,6 +359,21 @@ class OdooSyncManager:
         )
         if warehouses:
             self.ordercast_manager.save_warehouse(warehouses, odoo_repo=self.repo)
+
+    def sync_orders_with_odoo(self, order_ids=None, from_date=None) -> None:
+        orders = self.ordercast_manager.get_orders(
+            order_ids, from_date=from_date, odoo_repo=self.repo
+        )
+        logger.info(f"Loaded {len(orders)} orders, start sending them to Odoo.")
+        self.odoo_manager.sync_orders(orders)
+
+    def sync_orders_with_ordercast(self, from_date=None) -> None:
+        orders = self.odoo_manager.receive_orders(from_date=from_date)
+        logger.info(
+            f"Received {len(orders) if orders else 0} orders, start saving them."
+        )
+        if orders:
+            self.ordercast_manager.sync_orders(orders, odoo_repo=self.repo)
 
 
 @lru_cache()

@@ -51,7 +51,7 @@ class OdooClient:
             isinstance(obj, list) and len(obj) > 1
         ):  # clear [int, str] mixed lists, leave only fist type
             first_type = None
-            remove_item = list()
+            remove_item = []
             for item in obj:
                 if first_type:
                     if first_type != type(item):

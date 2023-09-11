@@ -19,6 +19,14 @@ class OrderStatus(str, enum.Enum):
     # cancelled
     CANCEL_STATUS = "cancel"
 
+    SUBMITTED_STATUS = "submitted"
+    PENDING_PAYMENT_STATUS = "pending_payment"
+    IN_PROGRESS_STATUS = "in_progress"
+    PROCESSED_STATUS = "processed"
+    COMPLETED_STATUS = "completed"
+    CANCELLED_BY_CLIENT_STATUS = "client_canceled"
+    CANCELLED_BY_ADMIN_STATUS = "admin_canceled"
+
 
 class InvoiceStatus(str, enum.Enum):
     INV_NO_STATUS = "no"
