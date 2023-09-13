@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timezone
 from functools import lru_cache
-from typing import Annotated
+from typing_extensions import Annotated
 
 import structlog
 from fastapi import Depends
@@ -44,18 +44,17 @@ class OdooSyncManager:
         self.sync_orders_with_ordercast(
             from_date=self.repo.get_key(RedisKeys.LAST_SUCCESSFUL_ODOO_SYNC_DATE)
         )
-        self.check_deletion()
+        # self.check_deletion()?
 
     def sync_users(self):
-        logger.info("Started syncing user's data with Odoo.")
+        logger.info("Started syncing user's data with Ordercast.")
         self.sync_users_from_odoo()
-        self.sync_users_to_odoo()
 
     def sync_users_from_odoo(self):
-        users = self.repo.get_list(key=RedisKeys.USERS)
+        existing_users = self.repo.get_list(key=RedisKeys.USERS)
         partners = validate_partners(
             self.odoo_manager.receive_partner_users(
-                exclude_user_ids=[p.odoo_id for p in users]
+                exclude_user_ids=[p.odoo_id for p in existing_users]
             ),
             odoo_repo=self.repo,
             ordercast_manager=self.ordercast_manager,
@@ -63,19 +62,15 @@ class OdooSyncManager:
         logger.info(f"Received partners => {len(partners)}, started saving them.")
 
         for partner in partners:
-            # if 'email' in partner and partner['email']:
             if partner.email:
-                # external_user = UserExternal.all_objects.filter(odoo_id=partner["id"]).first()
                 odoo_user = self.repo.get(key=RedisKeys.USERS, entity_id=partner.id)
                 if not odoo_user:
                     email = partner["email"]
-                    # exists_by_email = User.all_objects.filter(email=email).first()
                     ordercast_partner = self.ordercast_manager.get_user(email)
                     if ordercast_partner:
                         logger.warning(
                             f"User with email {email} already exists, ignoring."
                         )
-                        # existing_external_object = UserExternal.all_objects.filter(user_id=exists_by_email.id).first()
                         existing_odoo_user = self.repo.get(
                             key=RedisKeys.USERS, entity_id=ordercast_partner.id
                         )
@@ -87,10 +82,7 @@ class OdooSyncManager:
                                 key=RedisKeys.USERS,
                                 entity_id=existing_odoo_user.odoo_id,
                             )
-                            # existing_external_object.is_removed = False
-                            # existing_external_object.save()
                         else:
-                            # UserExternal.all_objects.update_or_create(user_id=exists_by_email.id, odoo_id=partner["id"])
                             self.repo.insert(
                                 key=RedisKeys.USERS,
                                 entity=OdooUser(
@@ -111,13 +103,10 @@ class OdooSyncManager:
                             "status": UserStatus.NEW,
                         }
 
-                        # saved, is_new = User.all_objects.update_or_create(email=email, defaults=defaults)
                         saved = self.ordercast_manager.upsert_user(
                             email=email, defaults=defaults
                         )
 
-                        # UserExternal.all_objects.update_or_create(user_id=saved.id, odoo_id=partner["id"],
-                        #                                           defaults={'is_removed': False})
                         self.repo.insert(
                             key=RedisKeys.USERS,
                             entity=OdooUser(
@@ -141,8 +130,8 @@ class OdooSyncManager:
                             defaults["website"] = partner["website"]
                         if not is_empty(partner, "comment"):
                             defaults["info"] = partner["comment"]
-                        # saved_profile, is_new = ProfileSettings.objects.update_or_create(user_id=saved.id,
-                        #                                                                  defaults=defaults)
+
+                        # TODO: company -> settings
                         user_profile = self.ordercast_manager.create_user_profile(
                             user_id=saved.id, defaults=defaults
                         )
@@ -162,8 +151,6 @@ class OdooSyncManager:
                                 if is_not_empty(shipping_address, "name"):
                                     name = shipping_address["name"]
                                 address = self.save_address(shipping_address, saved)
-                                # shipping, _ = ShippingAddress.objects.update_or_create(name=name, user_id=saved.id,
-                                #                                                        address_id=address.id)
                                 self.ordercast_manager.create_shipping_address(
                                     user_id=saved.id, name=name, address_id=address.id
                                 )
@@ -251,14 +238,6 @@ class OdooSyncManager:
             )
             return address
 
-    def sync_users_to_odoo(self):
-        send_users = True  # todo: extract this to configuration
-        if send_users:
-            users = self.ordercast_manager.get_users(odoo_repo=self.repo)
-            logger.info(f"Loaded users => {len(users)}, started sending them to Odoo.")
-            if users:
-                self.odoo_manager.sync_users(users)
-
     def sync_products(self, full_sync=False):
         # last_sync_date = (
         #     ProductGroupExternal.objects.last_sync_date() if not full_sync else None
@@ -298,7 +277,6 @@ class OdooSyncManager:
             category_last_sync_date = None
             logger.info(f"There products are changed, receiving all categories.")
         else:
-            # category_last_sync_date = CategoryExternal.objects.last_sync_date()
             category_last_sync_date = self.repo.get_last_sync_date(OdooCategory)
 
         categories = self.odoo_manager.get_categories(category_last_sync_date)

@@ -6,6 +6,6 @@ pydantic
 ruff
 mypy
 redis[hiredis]
-requests
+httpx
 structlog
 regex

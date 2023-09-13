@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import Self, Optional
+from typing import Optional
 
 from pydantic import BaseModel, PositiveInt
 
@@ -41,7 +41,7 @@ class OdooUser(OdooCommons):
     user: PositiveInt
 
     @classmethod
-    def from_json(cls, user_json: str) -> Self:
+    def from_json(cls, user_json: str) -> "OdooUser":
         return cls(**json.loads(user_json))
 
 
@@ -58,7 +58,7 @@ class OdooAddress(OdooCommons):
     original_address_id: PositiveInt
 
     @classmethod
-    def from_json(cls, user_json: str) -> Self:
+    def from_json(cls, user_json: str) -> "OdooAddress":
         return cls(**json.loads(user_json))
 
 

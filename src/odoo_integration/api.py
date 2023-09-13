@@ -24,7 +24,8 @@ async def sync(
     odoo_sync_manager: Annotated[OdooSyncManager, Depends(get_odoo_sync_manager)],
     background_tasks: BackgroundTasks,
 ) -> Response:
-    background_tasks.add_task(odoo_sync_manager.sync)
+    odoo_sync_manager.sync()
+    # background_tasks.add_task(odoo_sync_manager.sync)
     # odoo_sync_manager.repo.save_user(
     #     OdooUser(
     #         odoo_id=1,

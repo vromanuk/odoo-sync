@@ -1,7 +1,7 @@
 from .base_response import Response
 from .exceptions import OrdercastApiValidationException, OrdercastApiServerException
 from .requests import (
-    BulkSignUpByErpIdRequest,
+    BulkSignUpRequest,
     CreateShippingAddressRequest,
     ListBillingAddressesRequest,
     ListShippingAddressesRequest,
@@ -12,7 +12,7 @@ __all__ = (
     "Response",
     "OrdercastApiValidationException",
     "OrdercastApiServerException",
-    "BulkSignUpByErpIdRequest",
+    "BulkSignUpRequest",
     "CreateShippingAddressRequest",
     "ListShippingAddressesRequest",
     "ListBillingAddressesRequest",
