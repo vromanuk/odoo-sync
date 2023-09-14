@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 import structlog
 from fastapi import Depends
@@ -9,6 +9,9 @@ from src.api import (
     ListBillingAddressesRequest,
     ListShippingAddressesRequest,
     CreateOrderRequest,
+    BulkSignUpRequest,
+    UpdateSettingsRequest,
+    CreateBillingAddressRequest,
 )
 from src.data import (
     OdooProductGroup,
@@ -19,6 +22,7 @@ from src.data import (
     OdooOrder,
     InvoiceStatus,
     OrderStatus,
+    Locale,
 )
 from src.infrastructure import OrdercastApi, get_ordercast_api
 from .exceptions import OdooSyncException
@@ -49,32 +53,61 @@ class OrdercastManager:
     def get_user(self, email: str):
         return self.ordercast_api.get_merchant(email)
 
-    def upsert_user(self, email: str, defaults: dict[str, Any]):
-        return self.ordercast_api.bulk_signup()
+    def upsert_users(self, users_to_sync: list[dict[str, Any]]) -> None:
+        self.ordercast_api.bulk_signup(
+            [
+                BulkSignUpRequest(
+                    erp_id=user["erp_id"],
+                    name=user["name"],
+                    phone=user["phone"],
+                    city=user["city"],
+                    sector_id=user.get("sector_id", 1),
+                    postcode=user["postcode"],
+                    street=user["street"],
+                    vat=user.get("vat", "") or "",
+                    website=user.get("website", "") or "",
+                    info=user.get("info", "") or "",
+                    corporate_status_id=user.get("corporate_status_id", 1),
+                    country_alpha_2=user.get("country_alpha_2", "GB"),
+                )
+                for user in users_to_sync
+            ]
+        )
+
+    def create_billing_address(self, user: dict[str, Any]) -> None:
+        for billing_address in user["odoo_data"]["billing_addresses"]:
+            self.ordercast_api.create_billing_address(
+                CreateBillingAddressRequest(
+                    merchant_id=user["merchant_id"],
+                    name=user["name"],
+                    street=user["street"],
+                    city=user["city"],
+                    postcode=user["postcode"],
+                    country=user["country"],
+                    contact_name=user["contact_name"],
+                    contact_phone=user["contact_phone"],
+                    corporate_status_name=user["corporate_status_name"],
+                    vat=user["vat"],
+                )
+            )
 
     def create_shipping_address(
         self,
-        user_id: int,
-        name: str,
-        street: str,
-        city: str,
-        postcode: str,
-        country: str,
-        contact_name: Optional[str] = None,
-        contact_phone: Optional[str] = None,
+        user: dict[str, Any],
     ):
-        return self.ordercast_api.create_shipping_address(
-            CreateShippingAddressRequest(
-                merchange_id=user_id,
-                name=name,
-                street=street,
-                city=city,
-                postcode=postcode,
-                country=country,
-                contact_name=contact_name,
-                contact_phone=contact_phone,
+        for shipping_address in user["odoo_data"]["shipping_addresses"]:
+            self.ordercast_api.create_shipping_address(
+                CreateShippingAddressRequest(
+                    merchange_id=user["id"],
+                    name=user["name"],
+                    street=user["street"],
+                    city=user["city"],
+                    postcode=user["postcode"],
+                    country=user["country"],
+                    contact_name=user["contact_name"],
+                    contact_phone=user["contact_phone"],
+                )
             )
-        )
 
     def get_billing_addresses(self, merchant_id: int):
         return self.ordercast_api.list_billing_addresses(
@@ -84,6 +117,19 @@ class OrdercastManager:
     def get_shipping_addresses(self, merchant_id: int):
         return self.ordercast_api.list_shipping_addresses(
             ListShippingAddressesRequest(merchant_id=merchant_id)
+        )
+
+    def set_default_language(self, locale: Locale) -> None:
+        self.ordercast_api.update_default_language(locale)
+
+    def update_settings(self, settings: dict[str, str]) -> None:
+        self.ordercast_api.update_settings(
+            UpdateSettingsRequest(
+                url=settings.get("website", ""),
+                extra_phone=settings.get("extra_phone", ""),
+                fax=settings.get("fax", ""),
+                payment_info=settings.get("payment_info", ""),
+            )
         )
 
     def get_address(self, address, odoo_repo: OdooRepo):
@@ -247,7 +293,7 @@ class OrdercastManager:
         validate_attributes(attributes)
 
         for attribute in attributes:  # save locally received attributes
-            self.upsert_user(attribute, attributes, Category.PRODUCT_ATTRIBUTE_TYPE)
+            self.upsert_users(attribute, attributes, Category.PRODUCT_ATTRIBUTE_TYPE)
 
             if "values" in attribute:
                 for value in attribute["values"]:

@@ -1,10 +1,11 @@
 import functools
 from http import HTTPStatus
-from typing_extensions import Annotated
+from typing import Annotated
 
 import httpx
 import structlog
 from fastapi import Depends
+from httpx import Response
 
 from src.api import (
     BulkSignUpRequest,
@@ -12,12 +13,15 @@ from src.api import (
     ListBillingAddressesRequest,
     ListShippingAddressesRequest,
     CreateOrderRequest,
+    UpdateSettingsRequest,
+    CreateBillingAddressRequest,
 )
 from src.api import (
     OrdercastApiValidationException,
     OrdercastApiServerException,
 )
 from src.config import OrdercastConfig, Settings, get_settings
+from src.data import Locale
 
 logger = structlog.getLogger(__name__)
 
@@ -59,10 +63,10 @@ class OrdercastApi:
         self._auth_headers = {"Authorization": f"Bearer {self._token}"}
 
     @error_handler
-    def bulk_sign_up(self, request: BulkSignUpRequest):
+    def bulk_signup(self, request: list[BulkSignUpRequest]) -> Response:
         return httpx.post(
             url=f"{self.base_url}/merchant/signup/",
-            data=request.model_dump(),
+            json=[model.model_dump() for model in request],
             headers=self._auth_headers,
         )
 
@@ -76,67 +80,65 @@ class OrdercastApi:
         pass
 
     @error_handler
-    def create_shipping_address(self, request: CreateShippingAddressRequest):
+    def create_shipping_address(
+        self, request: CreateShippingAddressRequest
+    ) -> Response:
         return httpx.post(
             url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping/",
             data=request.model_dump(),
             headers=self._auth_headers,
         )
 
-    def create_billing_info(self, enterprise_name, address_id, vat):
-        pass
-
-    def create_billing(self, name, user_id, billing_info_id):
-        pass
-
     @error_handler
-    def list_billing_addresses(self, request: ListBillingAddressesRequest):
+    def list_billing_addresses(self, request: ListBillingAddressesRequest) -> Response:
         return httpx.get(
             url=f"{self.base_url}/merchant/{request.merchant_id}/address/billing/",
             headers=self._auth_headers,
         )
 
     @error_handler
-    def list_shipping_addresses(self, request: ListShippingAddressesRequest):
+    def list_shipping_addresses(
+        self, request: ListShippingAddressesRequest
+    ) -> Response:
         return httpx.get(
             url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping/",
             headers=self._auth_headers,
         )
 
     @error_handler
-    def upsert_categories(self, categories: list) -> None:
-        httpx.post(
+    def upsert_categories(self, categories: list) -> Response:
+        return httpx.post(
             url=f"{self.base_url}/category/",
             data=categories,
             headers=self._auth_headers,
         )
 
     @error_handler
-    def upsert_attributes(self, attributes) -> None:
-        httpx.post(
+    def upsert_attributes(self, attributes) -> Response:
+        return httpx.post(
             url=f"{self.base_url}/attribute/",
             data=attributes,
             headers=self._auth_headers,
         )
 
     @error_handler
-    def upsert_units(self, units: list) -> None:
-        httpx.post(
+    def upsert_units(self, units: list) -> Response:
+        return httpx.post(
             url=f"{self.base_url}/product/unit/",
             data=units,
             headers=self._auth_headers,
         )
 
     @error_handler
-    def upsert_products(self, products: list) -> None:
-        httpx.post(
+    def upsert_products(self, products: list) -> Response:
+        return httpx.post(
             url=f"{self.base_url}/product/",
             data=products,
             headers=self._auth_headers,
         )
 
     @error_handler
-    def get_orders(self, order_ids, from_date):
+    def get_orders(self, order_ids, from_date) -> Response:
         # TODO: introduce parameter passing
         return httpx.get(
             url=f"{self.base_url}/order/",
@@ -144,9 +146,32 @@ class OrdercastApi:
         )
 
     @error_handler
-    def create_order(self, request: CreateOrderRequest) -> None:
-        httpx.post(
+    def create_order(self, request: CreateOrderRequest) -> Response:
+        return httpx.post(
             url=f"{self.base_url}/order/?order_status_enum={request.order_status_enum}",
+            data=request.model_dump(),
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def update_default_language(self, locale: Locale) -> Response:
+        return httpx.put(
+            url=f"{self.base_url}/company/settings/language?={locale}",
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def update_settings(self, request: UpdateSettingsRequest) -> Response:
+        return httpx.put(
+            url=f"{self.base_url}/company/settings/settings",
+            data=request.model_dump(),
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def create_billing_address(self, request: CreateBillingAddressRequest) -> Response:
+        return httpx.post(
+            url=f"{self.base_url}/merchant/{request.merchant_id}/address/billing",
             data=request.model_dump(),
             headers=self._auth_headers,
         )

@@ -4,6 +4,8 @@ from .ordercast_api_requests import (
     ListBillingAddressesRequest,
     ListShippingAddressesRequest,
     CreateOrderRequest,
+    UpdateSettingsRequest,
+    CreateBillingAddressRequest,
 )
 
 __all__ = (
@@ -12,4 +14,6 @@ __all__ = (
     "ListShippingAddressesRequest",
     "ListBillingAddressesRequest",
     "CreateOrderRequest",
+    "UpdateSettingsRequest",
+    "CreateBillingAddressRequest",
 )

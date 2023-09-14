@@ -48,3 +48,26 @@ class CreateOrderRequest(BaseModel):
 
     class Config:
         exclude = {"order_status_enum"}
+
+
+class UpdateSettingsRequest(BaseModel):
+    url: Optional[str] = ""
+    extra_phone: Optional[str] = ""
+    fax: Optional[str] = ""
+    payment_info: Optional[str] = ""
+
+
+class CreateBillingAddressRequest(BaseModel):
+    merchant_id: PositiveInt
+    name: str
+    street: str
+    city: str
+    postcode: str
+    country: str
+    contact_name: Optional[str] = ""
+    contact_phone: Optional[str] = ""
+    corporate_status_name: Optional[str] = ""
+    vat: Optional[str] = ""
+
+    class Config:
+        exclude = {"merchant_id"}

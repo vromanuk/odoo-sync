@@ -39,17 +39,19 @@ class OdooManager:
                 parent_ids=[u["id"] for u in users], partner_type=PartnerType.ADDRESS
             )
             for user in users:
-                # user_dto = {'id': user['id'], 'name': user['name'], 'email': user['email']}
-
                 billing_addresses = []
                 shipping_addresses = []
-                if addresses:
-                    for address in addresses:
-                        if address["parent_id"] == user["id"]:
-                            if address["type"] == PartnerAddressType.INVOICE.value:
-                                billing_addresses.append(address)
-                            elif address["type"] == PartnerAddressType.DELIVERY.value:
-                                shipping_addresses.append(address)
+                for address in addresses:
+                    if (
+                        address["parent_id"] == user["id"]
+                        and address["type"] == PartnerAddressType.INVOICE.value
+                    ):
+                        billing_addresses.append(address)
+                    elif (
+                        address["parent_id"] == user["id"]
+                        and address["type"] == PartnerAddressType.DELIVERY.value
+                    ):
+                        shipping_addresses.append(address)
                 user["billing_addresses"] = billing_addresses
                 user["shipping_addresses"] = shipping_addresses
                 result.append(user)

@@ -1,13 +1,13 @@
 import secrets
 from datetime import datetime, timezone
 from functools import lru_cache
-from typing_extensions import Annotated
+from typing import Any, Annotated
 
 import structlog
 from fastapi import Depends
 
-from src.data import UserStatus, OdooUser, OdooAddress, OdooProductGroup, OdooProduct
-from .helpers import is_empty, is_not_empty, has_objects
+from src.data import UserStatus, OdooUser, OdooProductGroup, OdooProduct
+from .helpers import is_empty, has_objects
 from .odoo_manager import OdooManager, get_odoo_provider
 from .odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
 from .ordercast_manager import OrdercastManager, get_ordercast_manager
@@ -52,191 +52,62 @@ class OdooSyncManager:
 
     def sync_users_from_odoo(self):
         existing_users = self.repo.get_list(key=RedisKeys.USERS)
-        partners = validate_partners(
-            self.odoo_manager.receive_partner_users(
-                exclude_user_ids=[p.odoo_id for p in existing_users]
-            ),
-            odoo_repo=self.repo,
-            ordercast_manager=self.ordercast_manager,
+        partners = self.odoo_manager.receive_partner_users(
+            exclude_user_ids=[p.odoo_id for p in existing_users]
         )
+        validate_partners(partners)
+
         logger.info(f"Received partners => {len(partners)}, started saving them.")
 
-        for partner in partners:
-            if partner.email:
-                odoo_user = self.repo.get(key=RedisKeys.USERS, entity_id=partner.id)
-                if not odoo_user:
-                    email = partner["email"]
-                    ordercast_partner = self.ordercast_manager.get_user(email)
-                    if ordercast_partner:
-                        logger.warning(
-                            f"User with email {email} already exists, ignoring."
-                        )
-                        existing_odoo_user = self.repo.get(
-                            key=RedisKeys.USERS, entity_id=ordercast_partner.id
-                        )
-                        if existing_odoo_user:
-                            logger.warning(
-                                f"This user already mapped to Odoo id: {existing_odoo_user.odoo_id}, but this user come with id: {partner['id']}."
-                            )
-                            self.repo.remove(
-                                key=RedisKeys.USERS,
-                                entity_id=existing_odoo_user.odoo_id,
-                            )
-                        else:
-                            self.repo.insert(
-                                key=RedisKeys.USERS,
-                                entity=OdooUser(
-                                    odoo_id=partner["id"],
-                                    sync_date=datetime.now(timezone.utc),
-                                    user=ordercast_partner.id,
-                                ),
-                            )
-                    else:
-                        name = partner["name"]
-                        defaults = {
-                            "name": name,
-                            "erp_id": partner["id"],
-                            "is_approved": False,
-                            "is_active": True,
-                            "is_removed": False,
-                            "password": secrets.token_urlsafe(nbytes=64),
-                            "status": UserStatus.NEW,
-                        }
+        users_to_sync = [
+            {
+                "name": partner["name"],
+                "erp_id": partner["id"],
+                "is_approved": False,
+                "is_active": True,
+                "is_removed": False,
+                "password": secrets.token_urlsafe(nbytes=64),
+                "status": UserStatus.NEW,
+                "language": partner.get("language", "fr")
+                if partner.get("language") and len(partner.get("language")) == 2
+                else "fr",
+                "website": partner["website"]
+                if not is_empty(partner, "website")
+                else None,
+                "info": partner["comment"]
+                if not is_empty(partner, "comment")
+                else None,
+                "phone": partner.get("phone", ""),
+                "city": partner.get("city", ""),
+                "postcode": partner.get("postcode", ""),
+                "street": partner.get("street", ""),
+                "vat": partner.get("vat", ""),
+                "odoo_data": partner,
+            }
+            for partner in partners
+            if partner["email"]
+        ]
 
-                        saved = self.ordercast_manager.upsert_user(
-                            email=email, defaults=defaults
-                        )
-
-                        self.repo.insert(
-                            key=RedisKeys.USERS,
-                            entity=OdooUser(
-                                odoo_id=partner["id"],
-                                sync_date=datetime.now(timezone.utc),
-                                user=saved.id,
-                            ),
-                        )
-
-                        partner["saved_id"] = saved.id
-                        partner["saved"] = saved
-                        lang = (
-                            partner["language"]
-                            if "language" in partner
-                            and partner["language"]
-                            and len(partner["language"]) == 2
-                            else "fr"
-                        )
-                        defaults = {"language": lang}
-                        if not is_empty(partner, "website"):
-                            defaults["website"] = partner["website"]
-                        if not is_empty(partner, "comment"):
-                            defaults["info"] = partner["comment"]
-
-                        # TODO: company -> settings
-                        user_profile = self.ordercast_manager.create_user_profile(
-                            user_id=saved.id, defaults=defaults
-                        )
-                        partner["profile"] = user_profile
-                        self.save_billing_address(
-                            partner, saved, self.ordercast_manager
-                        )
-                        if is_not_empty(partner, "billing_addresses"):
-                            for billing_address in partner["billing_addresses"]:
-                                self.save_billing_address(
-                                    billing_address, saved, self.ordercast_manager
-                                )
-
-                        if is_not_empty(partner, "shipping_addresses"):
-                            for shipping_address in partner["shipping_addresses"]:
-                                name = None
-                                if is_not_empty(shipping_address, "name"):
-                                    name = shipping_address["name"]
-                                address = self.save_address(shipping_address, saved)
-                                self.ordercast_manager.create_shipping_address(
-                                    user_id=saved.id, name=name, address_id=address.id
-                                )
-                else:
-                    logger.info(
-                        f"User with email {partner['email']} already exists with id {odoo_user.user_id}, ignoring."
-                    )
-
-    def save_billing_address(
-        self, billing_address, saved, ordercast_manager: OrdercastManager
-    ):
-        if billing_address and saved:
-            name = None
-            vat = None
-            company_name = None
-            if is_not_empty(billing_address, "name"):
-                name = billing_address["name"]
-            if is_not_empty(billing_address, "company_name"):
-                company_name = billing_address["company_name"]
-            elif name:
-                company_name = name
-            if is_not_empty(billing_address, "vat"):
-                vat = billing_address["vat"]
-            address = self.save_address(billing_address, saved)
-            # billing_info, _ = BillingInfo.objects.update_or_create(
-            #     enterprise_name=company_name, address_id=address.id, vat=vat
-            # )
-            billing_info = ordercast_manager.create_billing_info(
-                enterprise_name=company_name, address_id=address.id, vat=vat
-            )
-            # billing_ = Billing.objects.update_or_create(
-            #     name=name, user_id=saved.id, billing_info_id=billing_info.id
-            # )
-            return ordercast_manager.create_billing(
-                name=name, user_id=saved.id, billing_info_id=billing_info.id
-            )
-
-    def save_address(self, address, user):
-        if address and user:
-            defaults_address = {}
-            name = None
-            if is_not_empty(address, "company_name"):
-                name = address["company_name"]
-            elif is_not_empty(address, "name"):
-                name = address["name"]
-            if is_not_empty(address, "email"):
-                defaults_address["email"] = address["email"]
-            if is_not_empty(address, "company_name"):
-                defaults_address["company_name"] = address["company_name"]
-            if is_not_empty(address, "company_name"):
-                defaults_address["name"] = address["company_name"]
-            if is_not_empty(address, "address_one"):
-                defaults_address["address_one"] = address["address_one"]
-            if is_not_empty(address, "address_two"):
-                defaults_address["address_two"] = address["address_two"]
-            if is_not_empty(address, "phone"):
-                defaults_address["phone"] = address["phone"]
-            if is_not_empty(address, "postal_code"):
-                defaults_address["code"] = address["postal_code"]
-            if is_not_empty(address, "city"):
-                # city = City.objects.filter(name__iexact=address['city']).first()
-                city = self.ordercast_manager.get_city(address["city"])
-                if city:
-                    defaults_address["city"] = city
-            if is_not_empty(address, "country_code"):
-                # country = Country.objects.filter(code2=address['country_code']).first()
-                country = self.ordercast_manager.get_country(
-                    code2=address["country_code"]
-                )
-                if country:
-                    defaults_address["country"] = country
-            # saved, _ = Address.objects.update_or_create(user_id=user.id, name=name, defaults=defaults_address)
-            address = self.ordercast_manager.create_address(
-                user_id=user.id, name=name, defaults=defaults_address
-            )
-            # AddressExternal.objects.update_or_create(address_id=saved.id, odoo_id=address['id'])
-            self.repo.insert(
-                key=RedisKeys.ADDRESSES,
-                entity=OdooAddress(
-                    odoo_id=address["id"],
+        self.ordercast_manager.upsert_users(users_to_sync=users_to_sync)
+        self.repo.insert_many(
+            key=RedisKeys.USERS,
+            entities=[
+                OdooUser(
+                    odoo_id=user["id"],
                     sync_date=datetime.now(timezone.utc),
-                    address=address.id,
-                    original_address_id=address.id,
-                ),
-            )
-            return address
+                    user=0,
+                )
+                for user in users_to_sync
+            ],
+        )
+        self.sync_billing(users=users_to_sync)
+
+    def sync_billing(self, users: list[dict[str, Any]]) -> None:
+        for partner in users:
+            self.ordercast_manager.update_settings(partner)
+            self.ordercast_manager.set_default_language(partner["language"])
+            self.ordercast_manager.create_billing_address(partner)
+            self.ordercast_manager.create_shipping_address(partner)
 
     def sync_products(self, full_sync=False):
         # last_sync_date = (

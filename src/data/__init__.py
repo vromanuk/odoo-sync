@@ -4,6 +4,7 @@ from .enums import (
     PartnerAddressType,
     OrderStatus,
     InvoiceStatus,
+    Locale,
 )
 from .models import (
     OdooUser,
@@ -36,4 +37,5 @@ __all__ = (
     "PartnerAddressType",
     "OrderStatus",
     "InvoiceStatus",
+    "Locale",
 )

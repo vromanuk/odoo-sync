@@ -1,5 +1,4 @@
-import xmlrpc.client
-from typing_extensions import Annotated
+from typing import Annotated
 
 from fastapi import Depends
 from odoo_rpc_client import Client

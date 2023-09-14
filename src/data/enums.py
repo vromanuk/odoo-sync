@@ -53,3 +53,15 @@ class PartnerAddressType(str, enum.Enum):
     DELIVERY = "delivery"
     OTHER = "other"
     PRIVATE = "private"
+
+
+class Locale(str, enum.Enum):
+    DE = "de"
+    EN = "en"
+    ES = "es"
+    FR = "fr"
+    IT = "it"
+    NL = "nl"
+    RU = "ru"
+    TR = "tr"
+    UK = "uk"

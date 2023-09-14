@@ -3,8 +3,6 @@ import structlog
 from src.infrastructure import OdooClient
 from .exceptions import OdooSyncException
 from .helpers import is_not_empty, is_empty, is_unique_by, is_length_not_in_range
-from .odoo_repo import OdooRepo, RedisKeys
-from .ordercast_manager import OrdercastManager
 
 logger = structlog.getLogger(__name__)
 
@@ -57,11 +55,9 @@ class Partner:
         return partner_dto
 
 
-def validate_partners(
-    users, odoo_repo: OdooRepo, ordercast_manager: OrdercastManager
-) -> list:
+def validate_partners(users) -> None:
     if not users:
-        return []
+        return
     unique_names = set()
     has_error = False
     for user in users:
@@ -92,22 +88,22 @@ def validate_partners(
             has_error = True
 
         # exists_by_email = User.all_objects.filter(email=user["email"]).first()
-        ordercast_user = ordercast_manager.get_user_by_email(user["email"])
-        if ordercast_user:
-            # existing_external_object = UserExternal.all_objects.filter(
-            #     user_id=exists_by_email.id
-            # ).first()
-            odoo_user = odoo_repo.get(key=RedisKeys.USERS, entity_id=ordercast_user.id)
-            if odoo_user and odoo_user.odoo_id != user["id"]:
-                logger.error(
-                    f"Received user with email '{user['email']}' already exists locally and it's Odoo id is '{odoo_user.odoo_id}' and name is '{ordercast_user.name}' coming Odoo id is '{user['id']}' and name is '{user['name']}'. Please give the another email to this '{user['name']}' partner in Odoo (check partners which has no children or archived)."
-                )
-                has_error = True
-            elif ordercast_user.name != user["name"]:
-                logger.error(
-                    f"Received user with email '{user['email']}' already exists locally, but not synced with Odoo. Please give the another email to this '{user['name']}' partner in Odoo (check partners which has no children or archived)."
-                )
-                has_error = True
+        # ordercast_user = ordercast_manager.get_user_by_email(user["email"])
+        # if ordercast_user:
+        #     existing_external_object = UserExternal.all_objects.filter(
+        #         user_id=exists_by_email.id
+        #     ).first()
+        #     odoo_user = odoo_repo.get(key=RedisKeys.USERS, entity_id=ordercast_user.id)
+        #     if odoo_user and odoo_user.odoo_id != user["id"]:
+        #         logger.error(
+        #             f"Received user with email '{user['email']}' already exists locally and it's Odoo id is '{odoo_user.odoo_id}' and name is '{ordercast_user.name}' coming Odoo id is '{user['id']}' and name is '{user['name']}'. Please give the another email to this '{user['name']}' partner in Odoo (check partners which has no children or archived)."
+        #         )
+        #         has_error = True
+        #     elif ordercast_user.name != user["name"]:
+        #         logger.error(
+        #             f"Received user with email '{user['email']}' already exists locally, but not synced with Odoo. Please give the another email to this '{user['name']}' partner in Odoo (check partners which has no children or archived)."
+        #         )
+        #         has_error = True
     if has_error:
         raise OdooSyncException(
             "User has errors. Please correct them in Odoo and try to sync again."
