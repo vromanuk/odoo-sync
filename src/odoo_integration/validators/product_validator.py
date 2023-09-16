@@ -11,13 +11,13 @@ import structlog
 logger = structlog.getLogger(__name__)
 
 
-def validate_product_groups(product_groups) -> None:
-    if not product_groups:
+def validate_products(products) -> None:
+    if not products:
         return
 
     unique_names_dict = {}
     has_error = False
-    for product_group in product_groups:
+    for product_group in products:
         # validate required fields.
         if is_empty(product_group, "id"):
             logger.error(

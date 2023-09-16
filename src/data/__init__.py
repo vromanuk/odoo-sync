@@ -9,10 +9,10 @@ from .enums import (
 from .models import (
     OdooUser,
     OdooAddress,
+    OdooProductVariant,
     OdooProduct,
-    OdooProductGroup,
     OdooAttribute,
-    OdooProduct,
+    OdooProductVariant,
     OdooDeliveryOption,
     OdooWarehouse,
     OdooOrder,
@@ -20,17 +20,19 @@ from .models import (
 )
 from .typings import OdooEntity
 
+from .ordercast_models import OrdercastMerchant
+
 __all__ = (
     "OdooUser",
     "OdooEntity",
     "UserStatus",
     "OdooAddress",
+    "OdooProductVariant",
     "OdooProduct",
-    "OdooProductGroup",
     "OdooAttribute",
     "OdooDeliveryOption",
     "OdooWarehouse",
-    "OdooProduct",
+    "OdooProductVariant",
     "OdooBasketProduct",
     "OdooOrder",
     "PartnerType",
@@ -38,4 +40,5 @@ __all__ = (
     "OrderStatus",
     "InvoiceStatus",
     "Locale",
+    "OrdercastMerchant",
 )

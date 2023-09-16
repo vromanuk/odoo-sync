@@ -1,9 +1,9 @@
 from typing import Union
 
 from .models import (
-    OdooProductGroup,
-    OdooCategory,
     OdooProduct,
+    OdooCategory,
+    OdooProductVariant,
     OdooAttribute,
     OdooOrder,
     OdooUser,
@@ -14,9 +14,9 @@ from .models import (
 )
 
 OdooEntity = Union[
-    OdooProductGroup
+    OdooProduct
     | OdooCategory
-    | OdooProduct
+    | OdooProductVariant
     | OdooAttribute
     | OdooOrder
     | OdooUser

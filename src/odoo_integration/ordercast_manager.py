@@ -15,15 +15,16 @@ from src.api import (
     ListMerchantsRequest,
 )
 from src.data import (
-    OdooProductGroup,
-    OdooAttribute,
     OdooProduct,
+    OdooAttribute,
+    OdooProductVariant,
     OdooDeliveryOption,
     OdooWarehouse,
     OdooOrder,
     InvoiceStatus,
     OrderStatus,
     Locale,
+    OrdercastMerchant,
 )
 from src.infrastructure import OrdercastApi, get_ordercast_api
 from .exceptions import OdooSyncException
@@ -36,9 +37,9 @@ from .helpers import (
 )
 from .odoo_repo import OdooRepo, RedisKeys
 from .validators import (
-    validate_product_groups,
-    validate_categories,
     validate_products,
+    validate_categories,
+    validate_product_variants,
     validate_attributes,
     validate_delivery_options,
     validate_warehouses,
@@ -51,11 +52,17 @@ class OrdercastManager:
     def __init__(self, ordercast_api: OrdercastApi) -> None:
         self.ordercast_api = ordercast_api
 
-    def get_users(self):
+    def get_users(self) -> list[OrdercastMerchant]:
+        # TODO: handle pagination
         response = self.ordercast_api.get_merchants(request=ListMerchantsRequest())
-        print()
+        users = response.json()["items"]
+        return [
+            OrdercastMerchant(id=user["id"], name=user["name"], erp_id=user["erp_id"])
+            for user in users
+        ]
 
     def upsert_users(self, users_to_sync: list[dict[str, Any]]) -> None:
+        default_sector_id = self.get_sector()
         self.ordercast_api.bulk_signup(
             [
                 BulkSignUpRequest(
@@ -63,7 +70,7 @@ class OrdercastManager:
                     name=user["name"],
                     phone=user["phone"],
                     city=user["city"],
-                    sector_id=user.get("sector_id", 1),
+                    sector_id=user.get("sector_id", default_sector_id),
                     postcode=user["postcode"],
                     street=user["street"],
                     vat=user["vat"],
@@ -134,6 +141,12 @@ class OrdercastManager:
             )
         )
 
+    def get_sector(self) -> id:
+        response = self.ordercast_api.list_sectors()
+        sectors = response.json()
+
+        return sectors[0]["id"]
+
     def get_address(self, address, odoo_repo: OdooRepo):
         if address:
             address_dto = {
@@ -166,19 +179,19 @@ class OrdercastManager:
                 address_dto["_remote_id"] = external_address.odoo_id
             return address_dto
 
-    def save_product_groups(self, product_groups, odoo_repo: OdooRepo):
-        groups = product_groups["objects"]
-        validate_product_groups(groups)
+    def save_products(self, products: dict[str, Any], odoo_repo: OdooRepo) -> None:
+        products = products["objects"]
+        validate_products(products)
 
-        for group in groups:
-            name = group["name"]
+        for product in products:
+            name = product["name"]
             defaults = {"name": name}
 
-            i18n_fields = get_i18n_field_as_dict(group, "name")
+            i18n_fields = get_i18n_field_as_dict(product, "name")
             defaults.update(i18n_fields)
 
-            if "ref" in group and len(group["ref"].strip()) > 1:
-                ref = group["ref"]  # fixme: add this hard validation, after testing
+            if "ref" in product and len(product["ref"].strip()) > 1:
+                ref = product["ref"]  # fixme: add this hard validation, after testing
                 # ref = self.get_unique_code(group['name'], 'name', ProductGroup.objects.order_by("name"), 'ref', False)
             else:
                 ref = self.get_unique_code(
@@ -245,9 +258,7 @@ class OrdercastManager:
                     # )
                     odoo_repo.insert(
                         key=RedisKeys.PRODUCT_GROUPS,
-                        entity=OdooProductGroup(
-                            odoo_id=group["id"], product_group=saved.id
-                        ),
+                        entity=OdooProduct(odoo_id=group["id"], product_group=saved.id),
                     )
 
             # TODO: do we need it?
@@ -355,7 +366,7 @@ class OrdercastManager:
                             value["saved_id"] = saved.id
                             value["saved"] = saved
 
-    def save_products(
+    def save_product_variants(
         self, categories, product_groups, attributes, products, odoo_repo: OdooRepo
     ) -> None:
         categories = categories["objects"]
@@ -364,7 +375,7 @@ class OrdercastManager:
         attributes = attributes["objects"]
         products = sorted(products, key=lambda d: d["display_name"])
 
-        validate_products(products)
+        validate_product_variants(products)
 
         saved_product_ids = []
         for product in products:
@@ -456,7 +467,9 @@ class OrdercastManager:
                     # ProductExternal.objects.update_or_create(product_id=saved_product.id, odoo_id=remote_id)
                     odoo_repo.insert(
                         key=RedisKeys.PRODUCTS,
-                        entity=OdooProduct(odoo_id=remote_id, product=saved_product.id),
+                        entity=OdooProductVariant(
+                            odoo_id=remote_id, product=saved_product.id
+                        ),
                     )
 
             # clear current categories and attributes.

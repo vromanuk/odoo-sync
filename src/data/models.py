@@ -14,8 +14,8 @@ class OdooCommons(BaseModel):
     sync_date: Optional[datetime]
 
 
-class OdooProductGroup(OdooCommons):
-    product_group: PositiveInt
+class OdooProduct(OdooCommons):
+    product: PositiveInt
 
 
 class OdooCategory(OdooCommons):
@@ -23,8 +23,8 @@ class OdooCategory(OdooCommons):
     category_type: CategoryType
 
 
-class OdooProduct(OdooCommons):
-    product: PositiveInt
+class OdooProductVariant(OdooCommons):
+    product_variant: PositiveInt
 
 
 class OdooAttribute(OdooCommons):

@@ -178,6 +178,13 @@ class OrdercastApi:
             headers=self._auth_headers,
         )
 
+    @error_handler
+    def list_sectors(self) -> Response:
+        return httpx.get(
+            url=f"{self.base_url}/sector/",
+            headers=self._auth_headers,
+        )
+
 
 # @lru_cache()
 def get_ordercast_api(

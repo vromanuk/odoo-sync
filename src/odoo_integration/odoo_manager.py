@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Any
 
 import structlog
 from fastapi import Depends
@@ -33,30 +33,39 @@ class OdooManager:
             exclude_user_ids=exclude_user_ids, partner_type=PartnerType.USER
         )
 
-        if users:
-            result = []
-            addresses = self.receive_partners(
-                parent_ids=[u["id"] for u in users], partner_type=PartnerType.ADDRESS
-            )
-            for user in users:
-                billing_addresses = []
-                shipping_addresses = []
-                for address in addresses:
-                    if (
-                        address["parent_id"] == user["id"]
-                        and address["type"] == PartnerAddressType.INVOICE.value
-                    ):
-                        billing_addresses.append(address)
-                    elif (
-                        address["parent_id"] == user["id"]
-                        and address["type"] == PartnerAddressType.DELIVERY.value
-                    ):
-                        shipping_addresses.append(address)
-                user["billing_addresses"] = billing_addresses
-                user["shipping_addresses"] = shipping_addresses
-                result.append(user)
+        if not users:
+            return []
 
-            return result
+        result = []
+        addresses = self.receive_partners(
+            parent_ids=[u["id"] for u in users], partner_type=PartnerType.ADDRESS
+        )
+        user_id_to_billing_addresses = {
+            user["id"]: [
+                address
+                for address in addresses
+                if address["parent_id"] == user["id"]
+                and address["type"] == PartnerAddressType.INVOICE.value
+            ]
+            for user in users
+        }
+        user_id_to_shipping_addresses = {
+            user["id"]: [
+                address
+                for address in addresses
+                if address["parent_id"] == user["id"]
+                and address["type"] == PartnerAddressType.DELIVERY.value
+            ]
+            for user in users
+        }
+        for user in users:
+            user["billing_addresses"] = user_id_to_billing_addresses.get(user["id"], [])
+            user["shipping_addresses"] = user_id_to_shipping_addresses.get(
+                user["id"], []
+            )
+            result.append(user)
+
+        return result
 
     def receive_partners(
         self, exclude_user_ids=None, parent_ids=None, partner_type=None
@@ -353,7 +362,7 @@ class OdooManager:
         )
         return send_partner
 
-    def get_product_groups(self, from_date: Optional[datetime]):
+    def get_products(self, from_date: Optional[datetime]) -> dict[str, Any]:
         product_groups = self.get_remote_updated_objects(
             "product.template",
             from_date=from_date,
@@ -361,22 +370,24 @@ class OdooManager:
             filter_criteria=[("is_published", "=", True), ("list_price", ">", 0.0)],
         )
         result = []
+
         for product_group in product_groups:
             group_dto = {"id": product_group["id"], "_remote_id": product_group["id"]}
             i18n_fields = get_i18n_field_as_dict(product_group, "name")
             group_dto.update(i18n_fields)
-            if product_group["display_name"]:
-                group_dto["name"] = product_group["display_name"]
-            if product_group["name"]:
-                group_dto["name"] = product_group["name"]
-            if product_group["barcode"]:
-                group_dto["barcode"] = product_group["barcode"]
-            if product_group["default_code"]:
-                group_dto["ref"] = product_group["default_code"]
-            if product_group["image_1920"]:
-                group_dto["image"] = product_group["image_1920"]
+
+            for field_name in [
+                "display_name",
+                "name",
+                "barcode",
+                "default_code",
+                "image_1920",
+            ]:
+                if product_group[field_name]:
+                    group_dto[field_name] = product_group[field_name]
 
             result.append(group_dto)
+
         return {
             "all_ids": self._client.get_all_object_ids(
                 "product.template",
@@ -436,7 +447,7 @@ class OdooManager:
             )
         return remote_objects
 
-    def get_products(self, from_date=Optional[datetime]):
+    def get_product_variants(self, from_date=Optional[datetime]):
         products = self.get_remote_updated_objects(
             "product.product",
             from_date=from_date,

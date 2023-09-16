@@ -8,9 +8,9 @@ from src.data import (
     OdooEntity,
     OdooUser,
     OdooAddress,
-    OdooProductGroup,
-    OdooAttribute,
     OdooProduct,
+    OdooAttribute,
+    OdooProductVariant,
     OdooDeliveryOption,
     OdooWarehouse,
     OdooOrder,
@@ -33,6 +33,9 @@ class RedisKeys(str, enum.Enum):
     LAST_SUCCESSFUL_ORDERCAST_SYNC_DATE = "ordercast_sync_date"
     LAST_SUCCESSFUL_ODOO_SYNC_DATE = "odoo_sync_date"
 
+    LAST_PRODUCT_SYNC = "last_product_sync"
+    LAST_PRODUCT_VARIANT_SYNC = "last_pv_sync"
+
 
 class OdooRepo:
     def __init__(self, client: RedisClient, prefix: str):
@@ -47,7 +50,7 @@ class OdooRepo:
             },
             RedisKeys.PRODUCT_GROUPS: {
                 "key": f"{self._prefix}:odoo:product_groups",
-                "model": OdooProductGroup,
+                "model": OdooProduct,
             },
             RedisKeys.ATTRIBUTES: {
                 "key": f"{self._prefix}:odoo:attributes",
@@ -55,7 +58,7 @@ class OdooRepo:
             },
             RedisKeys.PRODUCTS: {
                 "key": f"{self._prefix}:odoo:products",
-                "model": OdooProduct,
+                "model": OdooProductVariant,
             },
             RedisKeys.DELIVERY_OPTIONS: {
                 "key": f"{self._prefix}:odoo:delivery_options",

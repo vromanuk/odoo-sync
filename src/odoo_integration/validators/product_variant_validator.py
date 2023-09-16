@@ -14,10 +14,10 @@ from src.odoo_integration.helpers import (
 logger = structlog.getLogger(__name__)
 
 
-def validate_products(products) -> None:
+def validate_product_variants(product_variants) -> None:
     unique_refs = set()
     has_error = False
-    for product in products:
+    for product in product_variants:
         if is_empty(product, "id"):
             logger.error(
                 f"Received product with name '{product['name']}' has no remote id. Please correct it in Odoo."

@@ -39,24 +39,24 @@ def is_length_in_range(value, min_length, max_length):
         return min_length <= len(local_val) <= max_length
 
 
-def get_i18n_field_as_dict(data: dict, field, rename_field=None, reg_exp=None):
-    if data and field:
-        result = dict()
-        field_name = rename_field if rename_field else field
-        for lang_code, lang_val in SUPPORTED_LANGUAGES.items():
-            i18n_field = field + "_" + lang_code
-            rename_i18n_field = field_name + "_" + lang_code
-            default_value = data[field] if field in data else None
-            if i18n_field in data:
-                final_value = data[i18n_field]
-            else:
-                final_value = default_value
-            if reg_exp:
-                result[rename_i18n_field] = re.sub(reg_exp, "", final_value)
-            else:
-                result[rename_i18n_field] = final_value
+def get_i18n_field_as_dict(
+    data: dict, field: str, rename_field: str = None, reg_exp: str = None
+) -> dict[str, Any]:
+    result = {}
+    field_name = rename_field or field
+    default_value = data.get(field)
 
-        return result
+    for lang_code, lang_val in SUPPORTED_LANGUAGES.items():
+        i18n_field = f"{field}_{lang_code}"
+        rename_i18n_field = f"{field_name}_{lang_code}"
+        final_value = data.get(i18n_field, default_value)
+
+        if reg_exp:
+            result[rename_i18n_field] = re.sub(reg_exp, "", final_value)
+        else:
+            result[rename_i18n_field] = final_value
+
+    return result
 
 
 def get_field_with_i18n_fields(data: dict, field, rename_field=None, reg_exp=None):

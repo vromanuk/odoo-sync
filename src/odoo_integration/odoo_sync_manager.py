@@ -1,4 +1,3 @@
-import secrets
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any, Annotated
@@ -6,12 +5,12 @@ from typing import Any, Annotated
 import structlog
 from fastapi import Depends
 
-from src.data import UserStatus, OdooUser, OdooProductGroup, OdooProduct
-from .helpers import is_empty, has_objects
+from src.data import OdooUser
+from .helpers import has_objects
 from .odoo_manager import OdooManager, get_odoo_provider
 from .odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
 from .ordercast_manager import OrdercastManager, get_ordercast_manager
-from .partner import validate_partners
+from .partner import validate_partners, create_partner_data
 
 logger = structlog.getLogger(__name__)
 
@@ -62,31 +61,7 @@ class OdooSyncManager:
         logger.info(f"Received partners => {len(partners)}, started saving them.")
 
         users_to_sync = [
-            {
-                "name": partner["name"],
-                "erp_id": partner["id"],
-                "is_approved": False,
-                "is_active": True,
-                "is_removed": False,
-                "password": secrets.token_urlsafe(nbytes=64),
-                "status": UserStatus.NEW,
-                "language": partner.get("language", "fr")
-                if partner.get("language") and len(partner.get("language")) == 2
-                else "fr",
-                "website": partner["website"]
-                if not is_empty(partner, "website")
-                else "https://shop.company.domain",
-                "info": partner["comment"] if not is_empty(partner, "comment") else "",
-                "phone": partner.get("phone", "+3281000000"),
-                "city": partner.get("city", "Southampton"),
-                "postcode": partner.get("postcode", "21701"),
-                "street": partner.get("street", "81 Bedford Pl"),
-                "vat": partner.get("vat", "BE09999999XX"),
-                "email": partner["email"],
-                "odoo_data": partner,
-            }
-            for partner in partners
-            if partner["email"]
+            create_partner_data(partner) for partner in partners if partner["email"]
         ]
 
         self.ordercast_manager.upsert_users(users_to_sync=users_to_sync)
@@ -109,41 +84,34 @@ class OdooSyncManager:
             self.ordercast_manager.create_billing_address(partner)
             self.ordercast_manager.create_shipping_address(partner)
 
-    def sync_products(self, full_sync=False):
-        # last_sync_date = (
-        #     ProductGroupExternal.objects.last_sync_date() if not full_sync else None
-        # )
+    def sync_products(self, full_sync: bool = False) -> None:
         last_sync_date = (
-            None if full_sync else self.repo.get_last_sync_date(OdooProductGroup)
+            None if full_sync else self.repo.get_key(RedisKeys.LAST_PRODUCT_SYNC)
         )
-        # groups_dict = self.receive_provider.receive_product_groups(last_sync_date)
-        product_groups = self.odoo_manager.get_product_groups(last_sync_date)
+        products = self.odoo_manager.get_products(last_sync_date)
 
         logger.info(f"Connected to Odoo")
         logger.info(
-            f"Received {len(product_groups['objects']) if has_objects(product_groups) else 0} groups, start saving them."
+            f"Received {len(products['objects']) if has_objects(products) else 0} products, start saving them."
         )
 
-        if has_objects(product_groups):
-            self.ordercast_manager.save_product_groups(
-                product_groups, odoo_repo=self.repo
-            )
+        if has_objects(products):
+            self.ordercast_manager.save_products(products, odoo_repo=self.repo)
 
-        # last_sync_date = (
-        #     ProductExternal.objects.last_sync_date() if not full_sync else None
-        # )
         last_sync_date = (
-            None if full_sync else self.repo.get_last_sync_date(OdooProduct)
+            None
+            if full_sync
+            else self.repo.get_key(RedisKeys.LAST_PRODUCT_VARIANT_SYNC)
         )
-        products = self.odoo_manager.get_products(last_sync_date)
-        has_products = has_objects(products)
+        product_variants = self.odoo_manager.get_product_variants(last_sync_date)
+        has_product_variants = has_objects(product_variants)
 
         logger.info(
-            f"Received {len(products['objects']) if has_products else 0} products."
+            f"Received {len(product_variants['objects']) if has_product_variants else 0} products variants."
         )
 
         if (
-            has_products
+            has_product_variants
         ):  # in case when any product is changed sync from begin the categories. bug: when product category changed, but not synced
             category_last_sync_date = None
             logger.info(f"There products are changed, receiving all categories.")
@@ -184,12 +152,12 @@ class OdooSyncManager:
         if attributes:
             self.ordercast_manager.save_attributes(attributes, odoo_repo=self.repo)
 
-        if has_products:
+        if has_product_variants:
             logger.info(
                 f"Starting saving products after saving categories and attributes."
             )
-            self.ordercast_manager.save_products(
-                categories, product_groups, attributes, products, odoo_repo=self.repo
+            self.ordercast_manager.save_product_variants(
+                categories, products, attributes, product_variants, odoo_repo=self.repo
             )
 
     def sync_warehouses(self):
