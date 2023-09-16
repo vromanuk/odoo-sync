@@ -38,7 +38,7 @@ class OdooOrder(OdooCommons):
 
 
 class OdooUser(OdooCommons):
-    user: PositiveInt
+    user: Optional[PositiveInt] = None
 
     @classmethod
     def from_json(cls, user_json: str) -> "OdooUser":

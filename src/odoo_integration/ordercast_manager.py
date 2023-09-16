@@ -12,6 +12,7 @@ from src.api import (
     BulkSignUpRequest,
     UpdateSettingsRequest,
     CreateBillingAddressRequest,
+    ListMerchantsRequest,
 )
 from src.data import (
     OdooProductGroup,
@@ -50,8 +51,9 @@ class OrdercastManager:
     def __init__(self, ordercast_api: OrdercastApi) -> None:
         self.ordercast_api = ordercast_api
 
-    def get_user(self, email: str):
-        return self.ordercast_api.get_merchant(email)
+    def get_users(self):
+        response = self.ordercast_api.get_merchants(request=ListMerchantsRequest())
+        print()
 
     def upsert_users(self, users_to_sync: list[dict[str, Any]]) -> None:
         self.ordercast_api.bulk_signup(
@@ -64,9 +66,9 @@ class OrdercastManager:
                     sector_id=user.get("sector_id", 1),
                     postcode=user["postcode"],
                     street=user["street"],
-                    vat=user.get("vat", "") or "",
-                    website=user.get("website", "") or "",
-                    info=user.get("info", "") or "",
+                    vat=user["vat"],
+                    website=user["website"],
+                    info=user["info"],
                     corporate_status_id=user.get("corporate_status_id", 1),
                     country_alpha_2=user.get("country_alpha_2", "GB"),
                 )

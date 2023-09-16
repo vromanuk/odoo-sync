@@ -1,3 +1,5 @@
+from typing import Any
+
 import structlog
 
 from src.infrastructure import OdooClient
@@ -55,12 +57,14 @@ class Partner:
         return partner_dto
 
 
-def validate_partners(users) -> None:
-    if not users:
+def validate_partners(
+    partners: list[dict[str, Any]], ordercast_users: dict[str, Any]
+) -> None:
+    if not partners:
         return
     unique_names = set()
     has_error = False
-    for user in users:
+    for user in partners:
         if is_empty(user, "id"):
             logger.error(
                 f"Received user with name '{user['name']}' has no remote id. Please correct it in Odoo."

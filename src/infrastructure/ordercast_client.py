@@ -15,6 +15,7 @@ from src.api import (
     CreateOrderRequest,
     UpdateSettingsRequest,
     CreateBillingAddressRequest,
+    ListMerchantsRequest,
 )
 from src.api import (
     OrdercastApiValidationException,
@@ -60,7 +61,10 @@ class OrdercastApi:
     def __init__(self, config: OrdercastConfig):
         self.base_url = config.BASE_URL
         self._token = config.TOKEN
-        self._auth_headers = {"Authorization": f"Bearer {self._token}"}
+        self._auth_headers = {
+            "Authorization": f"Bearer {self._token}",
+            "accept": "application/json",
+        }
 
     @error_handler
     def bulk_signup(self, request: list[BulkSignUpRequest]) -> Response:
@@ -70,14 +74,12 @@ class OrdercastApi:
             headers=self._auth_headers,
         )
 
-    def get_merchant(self, email):
-        pass
-
-    def upsert_user(self, email, defaults):
-        pass
-
-    def create_user_profile(self, user_id, defaults):
-        pass
+    @error_handler
+    def get_merchants(self, request: ListMerchantsRequest) -> Response:
+        return httpx.get(
+            url=f"{self.base_url}/company/merchant/?pageIndex={request.pageIndex}&pageSize={request.pageSize}&prevId={request.prevId}",
+            headers=self._auth_headers,
+        )
 
     @error_handler
     def create_shipping_address(

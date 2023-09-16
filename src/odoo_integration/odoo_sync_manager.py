@@ -51,11 +51,13 @@ class OdooSyncManager:
         self.sync_users_from_odoo()
 
     def sync_users_from_odoo(self):
-        existing_users = self.repo.get_list(key=RedisKeys.USERS)
+        existing_odoo_users = self.repo.get_list(key=RedisKeys.USERS)
         partners = self.odoo_manager.receive_partner_users(
-            exclude_user_ids=[p.odoo_id for p in existing_users]
+            exclude_user_ids=[p.odoo_id for p in existing_odoo_users]
         )
-        validate_partners(partners)
+        validate_partners(
+            partners=partners, ordercast_users=self.ordercast_manager.get_users()
+        )
 
         logger.info(f"Received partners => {len(partners)}, started saving them.")
 
@@ -73,15 +75,13 @@ class OdooSyncManager:
                 else "fr",
                 "website": partner["website"]
                 if not is_empty(partner, "website")
-                else None,
-                "info": partner["comment"]
-                if not is_empty(partner, "comment")
-                else None,
-                "phone": partner.get("phone", ""),
-                "city": partner.get("city", ""),
-                "postcode": partner.get("postcode", ""),
-                "street": partner.get("street", ""),
-                "vat": partner.get("vat", ""),
+                else "https://shop.company.domain",
+                "info": partner["comment"] if not is_empty(partner, "comment") else "",
+                "phone": partner.get("phone", "+3281000000"),
+                "city": partner.get("city", "Southampton"),
+                "postcode": partner.get("postcode", "21701"),
+                "street": partner.get("street", "81 Bedford Pl"),
+                "vat": partner.get("vat", "BE09999999XX"),
                 "odoo_data": partner,
             }
             for partner in partners
@@ -93,9 +93,8 @@ class OdooSyncManager:
             key=RedisKeys.USERS,
             entities=[
                 OdooUser(
-                    odoo_id=user["id"],
+                    odoo_id=user["erp_id"],
                     sync_date=datetime.now(timezone.utc),
-                    user=0,
                 )
                 for user in users_to_sync
             ],
@@ -104,7 +103,6 @@ class OdooSyncManager:
 
     def sync_billing(self, users: list[dict[str, Any]]) -> None:
         for partner in users:
-            self.ordercast_manager.update_settings(partner)
             self.ordercast_manager.set_default_language(partner["language"])
             self.ordercast_manager.create_billing_address(partner)
             self.ordercast_manager.create_shipping_address(partner)

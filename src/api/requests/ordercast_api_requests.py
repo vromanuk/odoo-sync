@@ -40,6 +40,12 @@ class ListShippingAddressesRequest(BaseModel):
     merchant_id: PositiveInt
 
 
+class ListMerchantsRequest(BaseModel):
+    pageIndex: PositiveInt = 0
+    pageSize: PositiveInt = 50
+    prevId: PositiveInt = 0
+
+
 class CreateOrderRequest(BaseModel):
     order_status_enum: PositiveInt
     merchant_id: PositiveInt
