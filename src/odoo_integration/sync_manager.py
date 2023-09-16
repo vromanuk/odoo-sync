@@ -5,17 +5,22 @@ from typing import Any, Annotated
 import structlog
 from fastapi import Depends
 
-from src.data import OdooUser
-from .helpers import has_objects
+from src.data import OdooUser, OdooProduct
+from .helpers import has_objects, get_i18n_field_as_dict
 from .odoo_manager import OdooManager, get_odoo_provider
 from .odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
 from .ordercast_manager import OrdercastManager, get_ordercast_manager
 from .partner import validate_partners, create_partner_data
+from .validators import (
+    validate_products,
+    validate_categories,
+    validate_product_variants,
+)
 
 logger = structlog.getLogger(__name__)
 
 
-class OdooSyncManager:
+class SyncManager:
     def __init__(
         self,
         repo: OdooRepo,
@@ -85,80 +90,15 @@ class OdooSyncManager:
             self.ordercast_manager.create_shipping_address(partner)
 
     def sync_products(self, full_sync: bool = False) -> None:
-        last_sync_date = (
-            None if full_sync else self.repo.get_key(RedisKeys.LAST_PRODUCT_SYNC)
+        categories = self.sync_categories_to_ordercast()
+        attributes = self.sync_attributes_to_ordercast()
+        products = self.sync_products_to_ordercast(full_sync=full_sync)
+        self.sync_product_variants_to_ordercast(
+            categories=categories,
+            products=products,
+            attributes=attributes,
+            full_sync=full_sync,
         )
-        products = self.odoo_manager.get_products(last_sync_date)
-
-        logger.info(f"Connected to Odoo")
-        logger.info(
-            f"Received {len(products['objects']) if has_objects(products) else 0} products, start saving them."
-        )
-
-        if has_objects(products):
-            self.ordercast_manager.save_products(products, odoo_repo=self.repo)
-
-        last_sync_date = (
-            None
-            if full_sync
-            else self.repo.get_key(RedisKeys.LAST_PRODUCT_VARIANT_SYNC)
-        )
-        product_variants = self.odoo_manager.get_product_variants(last_sync_date)
-        has_product_variants = has_objects(product_variants)
-
-        logger.info(
-            f"Received {len(product_variants['objects']) if has_product_variants else 0} products variants."
-        )
-
-        if (
-            has_product_variants
-        ):  # in case when any product is changed sync from begin the categories. bug: when product category changed, but not synced
-            category_last_sync_date = None
-            logger.info(f"There products are changed, receiving all categories.")
-        else:
-            category_last_sync_date = self.repo.get_last_sync_date(OdooCategory)
-
-        categories = self.odoo_manager.get_categories(category_last_sync_date)
-
-        logger.info(
-            f"Received {len(categories['objects']) if categories['objects'] else 0} categories, start saving them."
-        )
-
-        if categories:
-            self.ordercast_manager.save_categories(categories)
-        if not full_sync:
-            last_attribute_name_sync = (
-                CategoryExternal.objects.filter(
-                    category__category_type=Category.PRODUCT_ATTRIBUTE_TYPE
-                )
-                .order_by("sync_date")
-                .last()
-            )
-            attribute_category_from_date = None
-            if last_attribute_name_sync:
-                attribute_category_from_date = last_attribute_name_sync.sync_date
-
-            attributes = self.odoo_manager.get_product_attributes(
-                from_date=attribute_category_from_date,
-                attribute_from_date=AttributeExternal.objects.last_sync_date(),
-            )
-        else:
-            attributes = self.odoo_manager.get_product_attributes()
-
-        logger.info(
-            f"Received {len(attributes['objects']) if attributes['objects'] else 0} attributes with total of {sum([len(a['values']) for a in attributes['objects'] if 'values' in a])} values, start saving them."
-        )
-
-        if attributes:
-            self.ordercast_manager.save_attributes(attributes, odoo_repo=self.repo)
-
-        if has_product_variants:
-            logger.info(
-                f"Starting saving products after saving categories and attributes."
-            )
-            self.ordercast_manager.save_product_variants(
-                categories, products, attributes, product_variants, odoo_repo=self.repo
-            )
 
     def sync_warehouses(self):
         delivery_options = self.odoo_manager.receive_delivery_options()
@@ -192,11 +132,97 @@ class OdooSyncManager:
         if orders:
             self.ordercast_manager.sync_orders(orders, odoo_repo=self.repo)
 
+    def sync_categories_to_ordercast(self) -> dict[str, Any]:
+        categories = self.odoo_manager.get_categories()
+        logger.info(
+            f"Received {len(categories['objects']) if categories['objects'] else 0} categories, start saving them."
+        )
+        if categories:
+            validate_categories(categories)
+            self.ordercast_manager.save_categories(categories["objects"])
+
+        return categories
+
+    def sync_attributes_to_ordercast(self) -> dict[str, Any]:
+        attributes = self.odoo_manager.get_product_attributes()
+
+        logger.info(
+            f"Received {len(attributes['objects']) if attributes['objects'] else 0} attributes with total of {sum([len(a['values']) for a in attributes['objects'] if 'values' in a])} values, start saving them."
+        )
+
+        if attributes:
+            self.ordercast_manager.save_attributes(attributes, odoo_repo=self.repo)
+
+        return attributes
+
+    def sync_products_to_ordercast(self, full_sync: bool = False) -> dict[str, Any]:
+        last_sync_date = (
+            None if full_sync else self.repo.get_key(RedisKeys.LAST_PRODUCT_SYNC)
+        )
+        products = self.odoo_manager.get_products(last_sync_date)
+
+        logger.info(f"Connected to Odoo")
+        logger.info(
+            f"Received {len(products['objects']) if has_objects(products) else 0} products, start saving them."
+        )
+
+        if has_objects(products):
+            validate_products(products)
+
+            products_to_sync = [
+                {
+                    "name": product["name"],
+                    "is_removed": False,
+                    "i18n_fields": get_i18n_field_as_dict(product, "name"),
+                }
+                for product in products["objects"]
+            ]
+
+            self.ordercast_manager.save_products(products_to_sync)
+            self.repo.insert_many(
+                key=RedisKeys.PRODUCTS,
+                entities=[
+                    OdooProduct(
+                        odoo_id=product["erp_id"],
+                    )
+                    for product in products_to_sync
+                ],
+            )
+        return products
+
+    def sync_product_variants_to_ordercast(
+        self,
+        categories: dict[str, Any],
+        products: dict[str, Any],
+        attributes: dict[str, Any],
+        full_sync: bool = False,
+    ) -> None:
+        last_sync_date = (
+            None
+            if full_sync
+            else self.repo.get_key(RedisKeys.LAST_PRODUCT_VARIANT_SYNC)
+        )
+        product_variants = self.odoo_manager.get_product_variants(last_sync_date)
+        has_product_variants = has_objects(product_variants)
+
+        logger.info(
+            f"Received {len(product_variants['objects']) if has_product_variants else 0} products variants."
+        )
+
+        if has_product_variants:
+            validate_product_variants(product_variants["objects"])
+            logger.info(
+                f"Starting saving products after saving categories and attributes."
+            )
+            self.ordercast_manager.save_product_variants(
+                categories, products, attributes, product_variants
+            )
+
 
 @lru_cache()
 def get_odoo_sync_manager(
     odoo_repo: Annotated[OdooRepo, Depends(get_odoo_repo)],
     odoo_provider: Annotated[OdooManager, Depends(get_odoo_provider)],
     ordercast_manager: Annotated[OrdercastManager, Depends(get_ordercast_manager)],
-) -> OdooSyncManager:
-    return OdooSyncManager(odoo_repo, odoo_provider, ordercast_manager)
+) -> SyncManager:
+    return SyncManager(odoo_repo, odoo_provider, ordercast_manager)

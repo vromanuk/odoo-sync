@@ -1,4 +1,5 @@
 import re
+from typing import Any
 
 import structlog
 
@@ -14,7 +15,12 @@ from src.odoo_integration.helpers import (
 logger = structlog.getLogger(__name__)
 
 
-def validate_product_variants(product_variants) -> None:
+def validate_product_variants(product_variants: dict[str, Any]) -> None:
+    product_variants = sorted(product_variants, key=lambda d: d["display_name"])
+
+    if not product_variants:
+        return
+
     unique_refs = set()
     has_error = False
     for product in product_variants:

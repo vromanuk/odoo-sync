@@ -11,11 +11,11 @@ class OdooCommons(BaseModel):
     odoo_id: PositiveInt
     created_at: datetime = datetime.now(timezone.utc)
     updated_at: datetime = datetime.now(timezone.utc)
-    sync_date: Optional[datetime]
+    sync_date: Optional[datetime] = None
 
 
 class OdooProduct(OdooCommons):
-    product: PositiveInt
+    product: Optional[PositiveInt] = None
 
 
 class OdooCategory(OdooCommons):

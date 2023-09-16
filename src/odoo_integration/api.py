@@ -4,7 +4,7 @@ import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends
 
 from src.api import Response
-from .odoo_sync_manager import get_odoo_sync_manager, OdooSyncManager
+from .sync_manager import get_odoo_sync_manager, SyncManager
 
 router = APIRouter(
     prefix="/sync",
@@ -21,7 +21,7 @@ logger = structlog.getLogger(__name__)
     response_model=Response,
 )
 async def sync(
-    odoo_sync_manager: Annotated[OdooSyncManager, Depends(get_odoo_sync_manager)],
+    odoo_sync_manager: Annotated[SyncManager, Depends(get_odoo_sync_manager)],
     background_tasks: BackgroundTasks,
 ) -> Response:
     odoo_sync_manager.sync()

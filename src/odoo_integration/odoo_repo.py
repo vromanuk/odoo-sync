@@ -22,9 +22,9 @@ from src.infrastructure import RedisClient, get_redis_client
 class RedisKeys(str, enum.Enum):
     USERS = "users"
     ADDRESSES = "addresses"
-    PRODUCT_GROUPS = "product_groups"
-    ATTRIBUTES = "attributes"
     PRODUCTS = "products"
+    ATTRIBUTES = "attributes"
+    PRODUCT_VARIANTS = "product_variants"
     DELIVERY_OPTIONS = "delivery_options"
     WAREHOUSES = "warehouses"
     ORDERS = "orders"
@@ -48,16 +48,16 @@ class OdooRepo:
                 "key": f"{self._prefix}:odoo:addresses",
                 "model": OdooAddress,
             },
-            RedisKeys.PRODUCT_GROUPS: {
-                "key": f"{self._prefix}:odoo:product_groups",
+            RedisKeys.PRODUCTS: {
+                "key": f"{self._prefix}:odoo:products",
                 "model": OdooProduct,
             },
             RedisKeys.ATTRIBUTES: {
                 "key": f"{self._prefix}:odoo:attributes",
                 "model": OdooAttribute,
             },
-            RedisKeys.PRODUCTS: {
-                "key": f"{self._prefix}:odoo:products",
+            RedisKeys.PRODUCT_VARIANTS: {
+                "key": f"{self._prefix}:odoo:product_variants",
                 "model": OdooProductVariant,
             },
             RedisKeys.DELIVERY_OPTIONS: {

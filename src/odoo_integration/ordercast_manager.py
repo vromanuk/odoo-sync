@@ -13,9 +13,10 @@ from src.api import (
     UpdateSettingsRequest,
     CreateBillingAddressRequest,
     ListMerchantsRequest,
+    UpsertProductsRequest,
+    UpsertCategoriesRequest,
 )
 from src.data import (
-    OdooProduct,
     OdooAttribute,
     OdooProductVariant,
     OdooDeliveryOption,
@@ -31,14 +32,11 @@ from .exceptions import OdooSyncException
 from .helpers import (
     is_length_not_in_range,
     get_i18n_field_as_dict,
-    is_not_ref,
     exists_in_all_ids,
     str_to_int,
 )
 from .odoo_repo import OdooRepo, RedisKeys
 from .validators import (
-    validate_products,
-    validate_categories,
     validate_product_variants,
     validate_attributes,
     validate_delivery_options,
@@ -179,123 +177,29 @@ class OrdercastManager:
                 address_dto["_remote_id"] = external_address.odoo_id
             return address_dto
 
-    def save_products(self, products: dict[str, Any], odoo_repo: OdooRepo) -> None:
-        products = products["objects"]
-        validate_products(products)
-
-        for product in products:
-            name = product["name"]
-            defaults = {"name": name}
-
-            i18n_fields = get_i18n_field_as_dict(product, "name")
-            defaults.update(i18n_fields)
-
-            if "ref" in product and len(product["ref"].strip()) > 1:
-                ref = product["ref"]  # fixme: add this hard validation, after testing
-                # ref = self.get_unique_code(group['name'], 'name', ProductGroup.objects.order_by("name"), 'ref', False)
-            else:
-                ref = self.get_unique_code(
-                    group["name"],
-                    "name",
-                    ProductGroup.all_objects.exclude(id=group["id"]).order_by("name"),
-                    "ref",
-                    False,
+    def save_products(self, products: list[dict[str, Any]]) -> None:
+        self.ordercast_api.upsert_products(
+            request=[
+                UpsertProductsRequest(
+                    name=product["name"], sku="", catalogs=[], categories=[]
                 )
-            if is_length_not_in_range(ref, 1, 191):
-                raise OdooSyncException(
-                    f"Received group '{ref}' has more than max 40 symbols. Please correct it in Odoo."
+                for product in products
+            ]
+        )
+
+    def save_categories(self, categories: dict[str, Any]) -> None:
+        self.ordercast_api.upsert_categories(
+            request=[
+                UpsertCategoriesRequest(
+                    name=category["name"],
+                    parent_id=category["parent_id"],
+                    parent_code=category["parent_code"],
+                    index=category["index"],
+                    code=category["code"],
                 )
-            if is_not_ref(ref):
-                raise OdooSyncException(
-                    f"Received group '{ref}' should contain only alpha, numbers, hyphen and dot. Please correct it in Odoo."
-                )
-
-            # external_group = ProductGroupExternal.objects.filter(
-            #     odoo_id=group["id"]
-            # ).first()
-            odoo_product_group = odoo_repo.get(
-                key=RedisKeys.PRODUCT_GROUPS, entity_id=group["id"]
-            )
-            # TODO: product_group -> product, product -> product_variant
-            defaults["is_removed"] = False
-            if odoo_product_group:
-                defaults["ref"] = ref
-                # saved, _ = ProductGroup.all_objects.update_or_create(
-                #     id=odoo_product_group.product_group.id, defaults=defaults
-                # )
-                saved = self.ordercast_api.create_product_group(
-                    id=odoo_product_group.product_group.id, defaults=defaults
-                )
-            else:
-                # saved, _ = ProductGroup.all_objects.update_or_create(
-                #     ref=ref, defaults=defaults
-                # )
-                saved = self.ordercast_api.create_product_group(
-                    ref=ref, defaults=defaults
-                )
-                # existing_odoo_product_group = ProductGroupExternal.objects.filter(
-                #     product_group=saved
-                # ).first()
-                existing_odoo_product_group = odoo_repo.get(
-                    key=RedisKeys.PRODUCT_GROUPS, entity_id=saved.id
-                )
-                if existing_odoo_product_group:
-                    if not exists_in_all_ids(
-                        existing_odoo_product_group.odoo_id, product_groups
-                    ):
-                        existing_odoo_product_group.odoo_id = group["id"]
-                        existing_odoo_product_group.save()
-                    elif existing_odoo_product_group.odoo_id != group["id"]:
-                        logger.warn(
-                            f"There is more than one '{group['name']}' group {[existing_odoo_product_group.odoo_id, group['id']]} in Odoo, so the first '{existing_odoo_product_group.odoo_id}' is used. "
-                            f"Please inform Odoo administrators that groups (product.templates) should be unified and stored only in one instance."
-                        )
-                        existing_odoo_product_group.save()
-                        # self.remove_duplicate_object_id(group['id'], groups_dict)
-                else:
-                    # ProductGroupExternal.objects.update_or_create(
-                    #     product_group_id=saved.id, odoo_id=group["id"]
-                    # )
-                    odoo_repo.insert(
-                        key=RedisKeys.PRODUCT_GROUPS,
-                        entity=OdooProduct(odoo_id=group["id"], product_group=saved.id),
-                    )
-
-            # TODO: do we need it?
-            # if "image" in group:
-            #     self.save_image(saved.pk, group["image"], saved.image)
-            # elif saved.image:
-            #     self.delete_file(saved.image)
-
-            saved.update_search_vector()
-
-            group["saved_id"] = saved.id
-            group["saved"] = saved
-
-    def save_categories(self, categories_dict: dict[str, Any]) -> None:
-        categories = categories_dict["objects"]
-
-        if not categories:
-            return
-
-        categories = sorted(categories, key=lambda d: d["name"])
-        validate_categories(categories)
-
-        # TODO: check
-        for category in categories:  # set parent category
-            if "parent" in category and category["parent"] and "saved" in category:
-                for parent in categories:
-                    if parent["id"] in category["parent"]:
-                        saved_child = category["saved"]
-                        saved_child.parent = parent["saved"]
-                        saved_child.save()
-
-        # TODO: do we need it?
-        # for category in categories:  # set paths
-        #     if 'saved' in category:
-        #         Category.objects.set_path_defaults(category['saved'])
-
-        self.ordercast_api.upsert_categories(categories)
+                for category in categories
+            ]
+        )
 
     def save_attributes(self, attributes: dict[str, Any], odoo_repo: OdooRepo) -> None:
         attributes = attributes["objects"]
@@ -367,39 +271,41 @@ class OrdercastManager:
                             value["saved"] = saved
 
     def save_product_variants(
-        self, categories, product_groups, attributes, products, odoo_repo: OdooRepo
+        self,
+        categories: dict[str, Any],
+        products: dict[str, Any],
+        attributes: dict[str, Any],
+        product_variants: dict[str, Any],
     ) -> None:
         categories = categories["objects"]
-        groups = product_groups["objects"]
         products = products["objects"]
+        product_variants = product_variants["objects"]
         attributes = attributes["objects"]
-        products = sorted(products, key=lambda d: d["display_name"])
+        product_variants = sorted(product_variants, key=lambda d: d["display_name"])
 
-        validate_product_variants(products)
-
-        saved_product_ids = []
-        for product in products:
-            remote_id = product["id"]
+        saved_product_variants_ids = []
+        for product_variant in product_variants:
+            remote_id = product_variant["id"]
 
             i18n_fields = get_i18n_field_as_dict(
-                product, "display_name", "name", r"^\[.*] ?"
+                product_variant, "display_name", "name", r"^\[.*] ?"
             )
 
-            name = product["display_name"]
-            ref = product["code"]
+            name = product_variant["display_name"]
+            ref = product_variant["code"]
             price = None
-            if "price" in product:
-                price = product["price"]
+            if "price" in product_variant:
+                price = product_variant["price"]
             pack = 1
-            if "unit_count" in product:
-                pack = product["unit_count"]
+            if "unit_count" in product_variant:
+                pack = product_variant["unit_count"]
             unit_name = None
-            if "attr_unit" in product:
-                unit_name = product["attr_unit"]
+            if "attr_unit" in product_variant:
+                unit_name = product_variant["attr_unit"]
 
             barcode = ""
-            if "barcode" in product:
-                barcode = product["barcode"]
+            if "barcode" in product_variant:
+                barcode = product_variant["barcode"]
                 if is_length_not_in_range(barcode, 1, 24):
                     raise OdooSyncException(
                         f"Received product barcode '{barcode}' has more than max 24 symbols. Please correct it in Odoo."
@@ -412,13 +318,13 @@ class OrdercastManager:
 
             group = None
             if (
-                groups
-                and "group" in product
-                and product["group"]
-                and len(product["group"]) > 0
+                products
+                and "group" in product_variant
+                and product_variant["group"]
+                and len(product_variant["group"]) > 0
             ):
-                group_id = product["group"][0]
-                for saved_groups in groups:
+                group_id = product_variant["group"][0]
+                for saved_groups in products:
                     if saved_groups["id"] == group_id:
                         group = saved_groups["saved"]
                         break
@@ -434,7 +340,9 @@ class OrdercastManager:
             defaults["is_removed"] = False
 
             # odoo_product = ProductExternal.objects.filter(odoo_id=remote_id).first()
-            odoo_product = odoo_repo.get(key=RedisKeys.PRODUCTS, entity_id=remote_id)
+            odoo_product = odoo_repo.get(
+                key=RedisKeys.PRODUCT_VARIANTS, entity_id=remote_id
+            )
             if odoo_product:
                 defaults["ref"] = ref
                 # saved_product, _ = Product.all_objects.update_or_create(id=odoo_product.product.id,
@@ -449,11 +357,13 @@ class OrdercastManager:
                 )
                 # existing_odoo_product = ProductExternal.objects.filter(product__id=saved_product.id).first()
                 existing_odoo_product = odoo_repo.get(
-                    key=RedisKeys.PRODUCTS, entity_id=saved_product.id
+                    key=RedisKeys.PRODUCT_VARIANTS, entity_id=saved_product.id
                 )
 
                 if existing_odoo_product:
-                    if not exists_in_all_ids(existing_odoo_product.odoo_id, products):
+                    if not exists_in_all_ids(
+                        existing_odoo_product.odoo_id, product_variants
+                    ):
                         existing_odoo_product.odoo_id = remote_id
                         existing_odoo_product.save()
                     elif existing_odoo_product.odoo_id != remote_id:
@@ -466,7 +376,7 @@ class OrdercastManager:
                 else:
                     # ProductExternal.objects.update_or_create(product_id=saved_product.id, odoo_id=remote_id)
                     odoo_repo.insert(
-                        key=RedisKeys.PRODUCTS,
+                        key=RedisKeys.PRODUCT_VARIANTS,
                         entity=OdooProductVariant(
                             odoo_id=remote_id, product=saved_product.id
                         ),
@@ -476,16 +386,16 @@ class OrdercastManager:
             saved_product.category_products.all().delete()
             saved_product.attributes.all().delete()
 
-            product["saved_id"] = saved_product.id
-            product["saved"] = saved_product
+            product_variant["saved_id"] = saved_product.id
+            product_variant["saved"] = saved_product
 
             if (
                 categories
-                and "category" in product
-                and product["category"]
-                and len(product["category"]) > 0
+                and "category" in product_variant
+                and product_variant["category"]
+                and len(product_variant["category"]) > 0
             ):
-                product_categories = product["category"]
+                product_categories = product_variant["category"]
                 saved_product.categories = None
                 if type(product_categories) == list:
                     for product_category in product_categories:
@@ -502,10 +412,10 @@ class OrdercastManager:
                                 break
             if (
                 attributes
-                and "attribute_values" in product
-                and len(product["attribute_values"]) > 0
+                and "attribute_values" in product_variant
+                and len(product_variant["attribute_values"]) > 0
             ):
-                product_attribute_values = product["attribute_values"]
+                product_attribute_values = product_variant["attribute_values"]
                 for product_attribute_value in product_attribute_values:
                     found = False
                     for attribute in attributes:
@@ -523,21 +433,31 @@ class OrdercastManager:
                                             saved_product_attribute,
                                             is_new,
                                         ) = ProductAttribute.objects.update_or_create(
-                                            product=product["saved"],
+                                            product=product_variant["saved"],
                                             category=attribute["saved"],
                                             attribute=attribute_value["saved"],
                                         )
-                                        if "saved_product_attribute_ids" not in product:
-                                            product["saved_product_attribute_ids"] = []
-                                        if "saved_product_attributes" not in product:
-                                            product["saved_product_attributes"] = []
+                                        if (
+                                            "saved_product_attribute_ids"
+                                            not in product_variant
+                                        ):
+                                            product_variant[
+                                                "saved_product_attribute_ids"
+                                            ] = []
+                                        if (
+                                            "saved_product_attributes"
+                                            not in product_variant
+                                        ):
+                                            product_variant[
+                                                "saved_product_attributes"
+                                            ] = []
 
-                                        product["saved_product_attribute_ids"].append(
-                                            saved_product_attribute.id
-                                        )
-                                        product["saved_product_attributes"].append(
-                                            saved_product_attribute
-                                        )
+                                        product_variant[
+                                            "saved_product_attribute_ids"
+                                        ].append(saved_product_attribute.id)
+                                        product_variant[
+                                            "saved_product_attributes"
+                                        ].append(saved_product_attribute)
 
                                         # if saved_product:
                                         #     if saved_product.attributes is None:
@@ -554,16 +474,18 @@ class OrdercastManager:
                         if found:
                             break
 
-            if "image" in product:
-                self.save_image(saved_product.pk, product["image"], saved_product.image)
+            if "image" in product_variant:
+                self.save_image(
+                    saved_product.pk, product_variant["image"], saved_product.image
+                )
             elif saved_product.image:
                 self.delete_file(saved_product.image)
 
             saved_product.update_search_vector()
-            product["saved"] = saved_product
-            saved_product_ids.append(saved_product.id)
+            product_variant["saved"] = saved_product
+            saved_product_variants_ids.append(saved_product.id)
             counter = 0
-            price_discounts = product["price_discounts"]
+            price_discounts = product_variant["price_discounts"]
             if price_discounts:
                 price_discounts = price_discounts.split(";")
 
@@ -592,11 +514,13 @@ class OrdercastManager:
                 counter += 1
 
         # set grouper field for the products
-        if saved_product_ids:
+        if saved_product_variants_ids:
             grouper_attributes = [
                 (a.group.id, [b.category.code for b in a.attributes.all()])
                 for a in Product.objects.filter(
-                    id__in=saved_product_ids, attributes__gt=1, group__isnull=False
+                    id__in=saved_product_variants_ids,
+                    attributes__gt=1,
+                    group__isnull=False,
                 )
                 .distinct("group")
                 .order_by("group")
@@ -633,10 +557,10 @@ class OrdercastManager:
             "category_id",
         )
         group_ids = self.get_existing_ids(
-            product_groups, ProductGroupExternal.objects.all(), "product_group_id"
+            products, ProductGroupExternal.objects.all(), "product_group_id"
         )
         product_ids = self.get_existing_ids(
-            products, ProductExternal.objects.all(), "product_id"
+            product_variants, ProductExternal.objects.all(), "product_id"
         )
         attribute_ids = self.get_existing_ids(
             attributes,
@@ -905,7 +829,7 @@ class OrdercastManager:
                                 "name": product.name,
                             }
                             odoo_product = odoo_repo.get(
-                                key=RedisKeys.PRODUCTS, entity_id=product.id
+                                key=RedisKeys.PRODUCT_VARIANTS, entity_id=product.id
                             )
                             if odoo_product:
                                 product_dto["_remote_id"] = odoo_product.odoo_id

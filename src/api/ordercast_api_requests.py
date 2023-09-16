@@ -3,6 +3,12 @@ from typing import Optional
 from pydantic import BaseModel, PositiveInt
 
 
+class ImageObject(BaseModel):
+    filename: str
+    key: str
+    url: str
+
+
 class BulkSignUpRequest(BaseModel):
     erp_id: PositiveInt
     name: str
@@ -77,3 +83,20 @@ class CreateBillingAddressRequest(BaseModel):
 
     class Config:
         exclude = {"merchant_id"}
+
+
+class UpsertProductsRequest(BaseModel):
+    image: Optional[ImageObject] = None
+    name: str
+    sku: str
+    catalogs: list[PositiveInt]
+    categories: list[PositiveInt]
+
+
+class UpsertCategoriesRequest(BaseModel):
+    image: Optional[ImageObject] = None
+    name: str
+    parent_id: PositiveInt
+    parent_code: str
+    index: PositiveInt
+    code: str = ""

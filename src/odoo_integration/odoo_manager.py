@@ -363,17 +363,18 @@ class OdooManager:
         return send_partner
 
     def get_products(self, from_date: Optional[datetime]) -> dict[str, Any]:
-        product_groups = self.get_remote_updated_objects(
+        products = self.get_remote_updated_objects(
             "product.template",
             from_date=from_date,
             i18n_fields=["name"],
             filter_criteria=[("is_published", "=", True), ("list_price", ">", 0.0)],
         )
+
         result = []
 
-        for product_group in product_groups:
-            group_dto = {"id": product_group["id"], "_remote_id": product_group["id"]}
-            i18n_fields = get_i18n_field_as_dict(product_group, "name")
+        for product in products:
+            group_dto = {"id": product["id"], "_remote_id": product["id"]}
+            i18n_fields = get_i18n_field_as_dict(product, "name")
             group_dto.update(i18n_fields)
 
             for field_name in [
@@ -383,8 +384,8 @@ class OdooManager:
                 "default_code",
                 "image_1920",
             ]:
-                if product_group[field_name]:
-                    group_dto[field_name] = product_group[field_name]
+                if product[field_name]:
+                    group_dto[field_name] = product[field_name]
 
             result.append(group_dto)
 
@@ -448,7 +449,7 @@ class OdooManager:
         return remote_objects
 
     def get_product_variants(self, from_date=Optional[datetime]):
-        products = self.get_remote_updated_objects(
+        product_variants = self.get_remote_updated_objects(
             "product.product",
             from_date=from_date,
             i18n_fields=["display_name"],
@@ -471,81 +472,104 @@ class OdooManager:
                         )
                 return result_ids
 
-        result = (
-            []
-        )  # todo: check [(p['product_template_attribute_value_ids'],p['attribute_line_ids']) for p  in products if len(p['product_template_attribute_value_ids']) > 0]
-        for product in products:
-            product_dto = {
-                "id": product["id"],
-                "_remote_id": product["id"],
-                "name": product["display_name"],
+        result = []
+        for product_variant in product_variants:
+            product_variant_dto = {
+                "id": product_variant["id"],
+                "_remote_id": product_variant["id"],
+                "name": product_variant["display_name"],
             }
-            i18n_fields = get_i18n_field_as_dict(product, "display_name")
-            product_dto.update(i18n_fields)
+            i18n_fields = get_i18n_field_as_dict(product_variant, "display_name")
+            product_variant_dto.update(i18n_fields)
 
             if discounts:
-                product_dto["price_discounts"] = discounts
+                product_variant_dto["price_discounts"] = discounts
 
-            if "barcode" in product and product["barcode"]:
-                product_dto["barcode"] = product["barcode"]
-            if "display_name" in product and product["display_name"]:
-                product_dto["display_name"] = product["display_name"]
-            if "code" in product and product["code"]:
-                product_dto["code"] = product["code"]
-            if "partner_ref" in product and product["partner_ref"]:
-                product_dto["ref"] = product["partner_ref"]
-            if "lst_price" in product and product["lst_price"]:
-                product_dto["price"] = product["lst_price"]
-            elif "list_price" in product and product["list_price"]:
+            if "barcode" in product_variant and product_variant["barcode"]:
+                product_variant_dto["barcode"] = product_variant["barcode"]
+            if "display_name" in product_variant and product_variant["display_name"]:
+                product_variant_dto["display_name"] = product_variant["display_name"]
+            if "code" in product_variant and product_variant["code"]:
+                product_variant_dto["code"] = product_variant["code"]
+            if "partner_ref" in product_variant and product_variant["partner_ref"]:
+                product_variant_dto["ref"] = product_variant["partner_ref"]
+            if "lst_price" in product_variant and product_variant["lst_price"]:
+                product_variant_dto["price"] = product_variant["lst_price"]
+            elif "list_price" in product_variant and product_variant["list_price"]:
                 logger.warn(
-                    f"Product '{product['display_name']}' has no 'lst_price' so setting 'list_price'."
+                    f"Product '{product_variant['display_name']}' has no 'lst_price' so setting 'list_price'."
                 )
-                product_dto["price"] = product["list_price"]
-            if "image_1920" in product and product["image_1920"]:
-                product_dto["image"] = product["image_1920"]
-            if "volume" in product and product["volume"]:
-                product_dto["attr_volume"] = product["volume"]
-            if "volume_uom_name" in product and product["volume_uom_name"]:
-                product_dto["attr_volume_name"] = product["volume_uom_name"]
-            if "weight" in product and product["weight"]:
-                product_dto["attr_weight"] = product["weight"]
-            if "weight_uom_name" in product and product["weight_uom_name"]:
-                product_dto["attr_weight_name"] = product["weight_uom_name"]
-            if "color" in product and product["color"]:
-                product_dto["attr_color"] = product["color"]
-            if "uom_name" in product and product["uom_name"]:
-                product_dto["attr_unit"] = product["uom_name"]
-            if "base_unit_count" in product and product["base_unit_count"]:
-                product_dto["unit_count"] = product["base_unit_count"]
-            if "base_unit_price" in product and product["base_unit_price"]:
-                product_dto["unit_price"] = product["base_unit_price"]
+                product_variant_dto["price"] = product_variant["list_price"]
+            if "image_1920" in product_variant and product_variant["image_1920"]:
+                product_variant_dto["image"] = product_variant["image_1920"]
+            if "volume" in product_variant and product_variant["volume"]:
+                product_variant_dto["attr_volume"] = product_variant["volume"]
             if (
-                "product_template_attribute_value_ids" in product
-                and product["product_template_attribute_value_ids"]
+                "volume_uom_name" in product_variant
+                and product_variant["volume_uom_name"]
             ):
-                product_dto["attribute_values"] = get_attribute(
-                    product["product_template_attribute_value_ids"]
-                )
-            if product["public_categ_ids"] and len(product["public_categ_ids"]) > 0:
-                product_dto["category"] = self._client.get_object(
-                    product["public_categ_ids"]
-                )
-            if product["product_tmpl_id"] and len(product["product_tmpl_id"]) > 0:
-                product_dto["group"] = self._client.get_object(
-                    product["product_tmpl_id"]
+                product_variant_dto["attr_volume_name"] = product_variant[
+                    "volume_uom_name"
+                ]
+            if "weight" in product_variant and product_variant["weight"]:
+                product_variant_dto["attr_weight"] = product_variant["weight"]
+            if (
+                "weight_uom_name" in product_variant
+                and product_variant["weight_uom_name"]
+            ):
+                product_variant_dto["attr_weight_name"] = product_variant[
+                    "weight_uom_name"
+                ]
+            if "color" in product_variant and product_variant["color"]:
+                product_variant_dto["attr_color"] = product_variant["color"]
+            if "uom_name" in product_variant and product_variant["uom_name"]:
+                product_variant_dto["attr_unit"] = product_variant["uom_name"]
+            if (
+                "base_unit_count" in product_variant
+                and product_variant["base_unit_count"]
+            ):
+                product_variant_dto["unit_count"] = product_variant["base_unit_count"]
+            if (
+                "base_unit_price" in product_variant
+                and product_variant["base_unit_price"]
+            ):
+                product_variant_dto["unit_price"] = product_variant["base_unit_price"]
+            if (
+                "product_template_attribute_value_ids" in product_variant
+                and product_variant["product_template_attribute_value_ids"]
+            ):
+                product_variant_dto["attribute_values"] = get_attribute(
+                    product_variant["product_template_attribute_value_ids"]
                 )
             if (
-                product["product_variant_ids"]
-                and len(product["product_variant_ids"]) > 0
+                product_variant["public_categ_ids"]
+                and len(product_variant["public_categ_ids"]) > 0
             ):
-                product_dto["product_variant"] = self._client.get_object(
-                    product["product_variant_ids"]
+                product_variant_dto["category"] = self._client.get_object(
+                    product_variant["public_categ_ids"]
                 )
-            if product["attribute_line_ids"] and len(product["attribute_line_ids"]) > 0:
-                product_dto["attr_dynamic"] = self._client.get_object(
-                    product["attribute_line_ids"]
+            if (
+                product_variant["product_tmpl_id"]
+                and len(product_variant["product_tmpl_id"]) > 0
+            ):
+                product_variant_dto["group"] = self._client.get_object(
+                    product_variant["product_tmpl_id"]
                 )
-            result.append(product_dto)
+            if (
+                product_variant["product_variant_ids"]
+                and len(product_variant["product_variant_ids"]) > 0
+            ):
+                product_variant_dto["product_variant"] = self._client.get_object(
+                    product_variant["product_variant_ids"]
+                )
+            if (
+                product_variant["attribute_line_ids"]
+                and len(product_variant["attribute_line_ids"]) > 0
+            ):
+                product_variant_dto["attr_dynamic"] = self._client.get_object(
+                    product_variant["attribute_line_ids"]
+                )
+            result.append(product_variant_dto)
         return {
             "all_ids": self._client.get_all_object_ids(
                 "product.product",
@@ -554,7 +578,7 @@ class OdooManager:
             "objects": result,
         }
 
-    def get_categories(self, from_date=Optional[datetime]):
+    def get_categories(self, from_date=Optional[datetime]) -> dict[str, Any]:
         categories = self.get_remote_updated_objects(
             "product.public.category", from_date=from_date, i18n_fields=["name"]
         )
@@ -957,7 +981,7 @@ class OdooManager:
                         )
                         if product_id:
                             odoo_product = self._repo.get(
-                                key=RedisKeys.PRODUCTS, entity_id=product_id
+                                key=RedisKeys.PRODUCT_VARIANTS, entity_id=product_id
                             )
                             if odoo_product:
                                 product = odoo_product.product

@@ -9,6 +9,8 @@ from .ordercast_api_requests import (
     UpdateSettingsRequest,
     CreateBillingAddressRequest,
     ListMerchantsRequest,
+    UpsertProductsRequest,
+    UpsertCategoriesRequest,
 )
 
 __all__ = (
@@ -23,4 +25,6 @@ __all__ = (
     "UpdateSettingsRequest",
     "CreateBillingAddressRequest",
     "ListMerchantsRequest",
+    "UpsertProductsRequest",
+    "UpsertCategoriesRequest",
 )

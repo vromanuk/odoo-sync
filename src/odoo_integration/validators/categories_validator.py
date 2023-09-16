@@ -1,3 +1,7 @@
+from typing import Any
+
+import structlog
+
 from src.odoo_integration.exceptions import OdooSyncException
 from src.odoo_integration.helpers import (
     is_empty,
@@ -6,14 +10,19 @@ from src.odoo_integration.helpers import (
     is_length_not_in_range,
 )
 
-import structlog
-
 logger = structlog.getLogger(__name__)
 
 
-def validate_categories(categories) -> None:
+def validate_categories(categories: dict[str, Any]) -> None:
+    categories = categories["objects"]
+
+    if not categories:
+        return
+
+    categories = sorted(categories, key=lambda d: d["name"])
     has_error = False
-    unique_names_dict = dict()
+    unique_names_dict = {}
+
     for category in categories:
         if is_empty(category, "id"):
             logger.error(
