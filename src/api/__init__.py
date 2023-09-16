@@ -1,6 +1,6 @@
 from .base_response import Response
 from .exceptions import OrdercastApiValidationException, OrdercastApiServerException
-from .requests import (
+from .ordercast_api_requests import (
     BulkSignUpRequest,
     CreateShippingAddressRequest,
     ListBillingAddressesRequest,
