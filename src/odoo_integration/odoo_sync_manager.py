@@ -82,6 +82,7 @@ class OdooSyncManager:
                 "postcode": partner.get("postcode", "21701"),
                 "street": partner.get("street", "81 Bedford Pl"),
                 "vat": partner.get("vat", "BE09999999XX"),
+                "email": partner["email"],
                 "odoo_data": partner,
             }
             for partner in partners
@@ -95,6 +96,7 @@ class OdooSyncManager:
                 OdooUser(
                     odoo_id=user["erp_id"],
                     sync_date=datetime.now(timezone.utc),
+                    email=user["email"],
                 )
                 for user in users_to_sync
             ],

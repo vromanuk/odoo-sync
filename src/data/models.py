@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel, PositiveInt
+from pydantic import BaseModel, PositiveInt, EmailStr
 
 from .enums import CategoryType, OrderStatus, InvoiceStatus
 
@@ -38,6 +38,7 @@ class OdooOrder(OdooCommons):
 
 
 class OdooUser(OdooCommons):
+    email: EmailStr
     user: Optional[PositiveInt] = None
 
     @classmethod
