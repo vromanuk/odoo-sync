@@ -1,7 +1,7 @@
 import structlog
 
-from src.odoo_integration.exceptions import OdooSyncException
-from src.odoo_integration.helpers import (
+from ..exceptions import OdooSyncException
+from ..helpers import (
     is_empty,
     get_field_with_i18n_fields,
     is_unique_by,

@@ -6,12 +6,12 @@ import structlog
 from fastapi import Depends
 
 from src.data import OdooUser, OdooProduct, OdooAttribute, OdooCategory, CategoryType
-from .helpers import has_objects, get_i18n_field_as_dict
-from .odoo_manager import OdooManager, get_odoo_provider
-from .odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
-from .ordercast_manager import OrdercastManager, get_ordercast_manager
-from .partner import validate_partners, create_partner_data
-from .validators import (
+from .internal.helpers import has_objects, get_i18n_field_as_dict
+from .internal.odoo_manager import OdooManager, get_odoo_provider
+from .internal.odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
+from .internal.ordercast_manager import OrdercastManager, get_ordercast_manager
+from .internal.partner import validate_partners, create_partner_data
+from .internal.validators import (
     validate_products,
     validate_categories,
     validate_product_variants,

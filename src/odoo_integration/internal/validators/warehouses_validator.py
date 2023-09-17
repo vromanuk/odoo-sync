@@ -1,7 +1,7 @@
 import structlog
 
-from src.odoo_integration.exceptions import OdooSyncException
-from src.odoo_integration.helpers import is_empty, is_unique_by, is_length_not_in_range
+from ..exceptions import OdooSyncException
+from ..helpers import is_empty, is_unique_by, is_length_not_in_range
 
 logger = structlog.getLogger(__name__)
 
