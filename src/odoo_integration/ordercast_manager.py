@@ -4,7 +4,19 @@ from typing import Annotated, Any
 import structlog
 from fastapi import Depends
 
-from src.api import (
+from src.data import (
+    OdooProductVariant,
+    OdooDeliveryOption,
+    OdooWarehouse,
+    OdooOrder,
+    InvoiceStatus,
+    OrderStatus,
+    Locale,
+    OrdercastMerchant,
+)
+from src.infrastructure import (
+    OrdercastApi,
+    get_ordercast_api,
     CreateShippingAddressRequest,
     ListBillingAddressesRequest,
     ListShippingAddressesRequest,
@@ -18,17 +30,6 @@ from src.api import (
     UpsertAttributesRequest,
     Merchant,
 )
-from src.data import (
-    OdooProductVariant,
-    OdooDeliveryOption,
-    OdooWarehouse,
-    OdooOrder,
-    InvoiceStatus,
-    OrderStatus,
-    Locale,
-    OrdercastMerchant,
-)
-from src.infrastructure import OrdercastApi, get_ordercast_api
 from .exceptions import OdooSyncException
 from .helpers import (
     is_length_not_in_range,

@@ -7,7 +7,13 @@ import structlog
 from fastapi import Depends
 from httpx import Response
 
-from src.api import (
+from src.config import OrdercastConfig, Settings, get_settings
+from src.data import Locale
+from .exceptions import (
+    OrdercastApiValidationException,
+    OrdercastApiServerException,
+)
+from .ordercast_api_requests import (
     BulkSignUpRequest,
     CreateShippingAddressRequest,
     ListBillingAddressesRequest,
@@ -20,12 +26,6 @@ from src.api import (
     UpsertCategoriesRequest,
     UpsertAttributesRequest,
 )
-from src.api import (
-    OrdercastApiValidationException,
-    OrdercastApiServerException,
-)
-from src.config import OrdercastConfig, Settings, get_settings
-from src.data import Locale
 
 logger = structlog.getLogger(__name__)
 

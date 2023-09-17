@@ -1,3 +1,3 @@
-from .api import router as sync_router
+from .sync_manager import SyncManager, get_odoo_sync_manager
 
-__all__ = ("sync_router",)
+__all__ = ("SyncManager", "get_odoo_sync_manager")
