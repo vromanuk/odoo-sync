@@ -1,3 +1,7 @@
+from typing import Any
+
+import structlog
+
 from src.odoo_integration.exceptions import OdooSyncException
 from src.odoo_integration.helpers import (
     is_empty,
@@ -6,12 +10,15 @@ from src.odoo_integration.helpers import (
     is_length_not_in_range,
 )
 
-import structlog
-
 logger = structlog.getLogger(__name__)
 
 
-def validate_attributes(attributes) -> None:
+def validate_attributes(attributes: dict[str, Any]) -> None:
+    attributes = attributes["objects"]
+
+    if not attributes:
+        return
+
     has_error = False
     unique_names_dict = {}
     for attribute in attributes:

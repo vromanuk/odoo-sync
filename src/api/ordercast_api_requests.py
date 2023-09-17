@@ -96,7 +96,16 @@ class UpsertProductsRequest(BaseModel):
 class UpsertCategoriesRequest(BaseModel):
     image: Optional[ImageObject] = None
     name: str
-    parent_id: PositiveInt
+    parent_id: Optional[PositiveInt]
     parent_code: str
     index: PositiveInt
     code: str = ""
+
+
+class UpsertAttributesRequest(BaseModel):
+    code: str
+    name: str
+    index: int = 1
+    input_type: int = 1
+    is_filter: bool = True
+    is_quick_search: bool = True

@@ -5,7 +5,7 @@ from typing import Any, Annotated
 import structlog
 from fastapi import Depends
 
-from src.data import OdooUser, OdooProduct
+from src.data import OdooUser, OdooProduct, OdooAttribute
 from .helpers import has_objects, get_i18n_field_as_dict
 from .odoo_manager import OdooManager, get_odoo_provider
 from .odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
@@ -15,6 +15,7 @@ from .validators import (
     validate_products,
     validate_categories,
     validate_product_variants,
+    validate_attributes,
 )
 
 logger = structlog.getLogger(__name__)
@@ -100,38 +101,6 @@ class SyncManager:
             full_sync=full_sync,
         )
 
-    def sync_warehouses(self):
-        delivery_options = self.odoo_manager.receive_delivery_options()
-        logger.info(
-            f"Received {len(delivery_options['objects']) if delivery_options and 'objects' in delivery_options else 0} delivery options, start saving them."
-        )
-        if delivery_options:
-            self.ordercast_manager.save_delivery_option(
-                delivery_options, odoo_repo=self.repo
-            )
-
-        warehouses = self.odoo_manager.receive_warehouses()
-        logger.info(
-            f"Received {len(warehouses['objects']) if warehouses and 'objects' in warehouses else 0} warehouses, start saving them."
-        )
-        if warehouses:
-            self.ordercast_manager.save_warehouse(warehouses, odoo_repo=self.repo)
-
-    def sync_orders_with_odoo(self, order_ids=None, from_date=None) -> None:
-        orders = self.ordercast_manager.get_orders(
-            order_ids, from_date=from_date, odoo_repo=self.repo
-        )
-        logger.info(f"Loaded {len(orders)} orders, start sending them to Odoo.")
-        self.odoo_manager.sync_orders(orders)
-
-    def sync_orders_with_ordercast(self, from_date=None) -> None:
-        orders = self.odoo_manager.receive_orders(from_date=from_date)
-        logger.info(
-            f"Received {len(orders) if orders else 0} orders, start saving them."
-        )
-        if orders:
-            self.ordercast_manager.sync_orders(orders, odoo_repo=self.repo)
-
     def sync_categories_to_ordercast(self) -> dict[str, Any]:
         categories = self.odoo_manager.get_categories()
         logger.info(
@@ -151,7 +120,33 @@ class SyncManager:
         )
 
         if attributes:
-            self.ordercast_manager.save_attributes(attributes, odoo_repo=self.repo)
+            validate_attributes(attributes)
+            attributes_to_sync = [
+                {
+                    "id": value["id"],
+                    "name": value["name"],
+                    **({"position": value["position"]} if "position" in value else {}),
+                    **get_i18n_field_as_dict(value, "name"),
+                }
+                for attribute in attributes["objects"]
+                for value in attribute.get("values", [])
+                if all(key in value for key in ("id", "name"))
+            ]
+
+            self.ordercast_manager.save_attributes(
+                attributes_to_sync=attributes_to_sync
+            )
+            self.repo.insert_many(
+                key=RedisKeys.ATTRIBUTES,
+                entities=[
+                    OdooAttribute(
+                        odoo_id=attribute["id"],
+                        name=attribute["name"],
+                        sync_date=datetime.now(timezone.utc),
+                    )
+                    for attribute in attributes_to_sync
+                ],
+            )
 
         return attributes
 
@@ -217,6 +212,38 @@ class SyncManager:
             self.ordercast_manager.save_product_variants(
                 categories, products, attributes, product_variants
             )
+
+    def sync_warehouses(self):
+        delivery_options = self.odoo_manager.receive_delivery_options()
+        logger.info(
+            f"Received {len(delivery_options['objects']) if delivery_options and 'objects' in delivery_options else 0} delivery options, start saving them."
+        )
+        if delivery_options:
+            self.ordercast_manager.save_delivery_option(
+                delivery_options, odoo_repo=self.repo
+            )
+
+        warehouses = self.odoo_manager.receive_warehouses()
+        logger.info(
+            f"Received {len(warehouses['objects']) if warehouses and 'objects' in warehouses else 0} warehouses, start saving them."
+        )
+        if warehouses:
+            self.ordercast_manager.save_warehouse(warehouses, odoo_repo=self.repo)
+
+    def sync_orders_with_odoo(self, order_ids=None, from_date=None) -> None:
+        orders = self.ordercast_manager.get_orders(
+            order_ids, from_date=from_date, odoo_repo=self.repo
+        )
+        logger.info(f"Loaded {len(orders)} orders, start sending them to Odoo.")
+        self.odoo_manager.sync_orders(orders)
+
+    def sync_orders_with_ordercast(self, from_date=None) -> None:
+        orders = self.odoo_manager.receive_orders(from_date=from_date)
+        logger.info(
+            f"Received {len(orders) if orders else 0} orders, start saving them."
+        )
+        if orders:
+            self.ordercast_manager.sync_orders(orders, odoo_repo=self.repo)
 
 
 @lru_cache()

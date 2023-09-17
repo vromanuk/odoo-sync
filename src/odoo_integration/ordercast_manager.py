@@ -15,9 +15,9 @@ from src.api import (
     ListMerchantsRequest,
     UpsertProductsRequest,
     UpsertCategoriesRequest,
+    UpsertAttributesRequest,
 )
 from src.data import (
-    OdooAttribute,
     OdooProductVariant,
     OdooDeliveryOption,
     OdooWarehouse,
@@ -37,8 +37,6 @@ from .helpers import (
 )
 from .odoo_repo import OdooRepo, RedisKeys
 from .validators import (
-    validate_product_variants,
-    validate_attributes,
     validate_delivery_options,
     validate_warehouses,
 )
@@ -187,88 +185,29 @@ class OrdercastManager:
             ]
         )
 
-    def save_categories(self, categories: dict[str, Any]) -> None:
+    def save_categories(self, categories: list[dict[str, Any]]) -> None:
         self.ordercast_api.upsert_categories(
             request=[
                 UpsertCategoriesRequest(
                     name=category["name"],
-                    parent_id=category["parent_id"],
+                    parent_id=category["parent"],
                     parent_code=category["parent_code"],
-                    index=category["index"],
-                    code=category["code"],
+                    index=category.get("index", 1),
+                    code=category.get("code", ""),
                 )
                 for category in categories
             ]
         )
 
-    def save_attributes(self, attributes: dict[str, Any], odoo_repo: OdooRepo) -> None:
-        attributes = attributes["objects"]
-
-        if not attributes:
-            return
-
-        validate_attributes(attributes)
-
-        for attribute in attributes:  # save locally received attributes
-            self.upsert_users(attribute, attributes, Category.PRODUCT_ATTRIBUTE_TYPE)
-
-            if "values" in attribute:
-                for value in attribute["values"]:
-                    if "id" in value and "name" in value:
-                        defaults_data = {}
-                        if "position" in value:
-                            defaults_data["position"] = value["position"]
-
-                            i18n_fields = get_i18n_field_as_dict(value, "name")
-                            defaults_data.update(i18n_fields)
-                            # external_attribute_value = AttributeExternal.objects.filter(odoo_id=value["id"]).first()
-                            external_attribute_value = odoo_repo.get(
-                                keys=RedisKeys.ATTRIBUTES, entity_id=value["id"]
-                            )
-                            if external_attribute_value:
-                                defaults_data["name"] = value["name"]
-                                # saved, _ = Attribute.objects.update_or_create(
-                                #     id=external_attribute_value.attribute.id, defaults=defaults_data)
-                                saved = self.ordercast_api.upsert_attributes(
-                                    id=external_attribute_value.attribute.id,
-                                    defaults=defaults_data,
-                                )
-                            else:
-                                # saved, _ = Attribute.objects.update_or_create(name=value['name'],
-                                #                                               defaults=defaults_data)
-                                saved = self.ordercast_api.upsert_attributes(
-                                    name=value["name"], defaults=defaults_data
-                                )
-
-                                # existing_external_object = AttributeExternal.objects.filter(
-                                #     attribute_id=saved.id).first()
-                                existing_odoo_attribute = odoo_repo.get(
-                                    key=RedisKeys.ATTRIBUTES, entity_id=saved.id
-                                )
-                                if existing_odoo_attribute:
-                                    if not exists_in_all_ids(
-                                        existing_odoo_attribute.odoo_id,
-                                        attributes["attribute_values"],
-                                    ):
-                                        existing_odoo_attribute.odoo_id = value["id"]
-                                        existing_odoo_attribute.save()
-                                    elif existing_odoo_attribute.odoo_id != value["id"]:
-                                        logger.warn(
-                                            f"There is more than one '{value['name']}' attribute value {[existing_odoo_attribute.odoo_id, value['id']]} in Odoo, so the first '{existing_odoo_attribute.odoo_id}' is used. "
-                                            f"Please inform Odoo administrators that attribute values should be unified and stored only in one instance."
-                                        )
-                                    existing_odoo_attribute.save()
-                                else:
-                                    # AttributeExternal.objects.update_or_create(attribute_id=saved.id,
-                                    #                                            odoo_id=value["id"])
-                                    odoo_repo.insert(
-                                        key=RedisKeys.ATTRIBUTES,
-                                        entity=OdooAttribute(
-                                            odoo_id=value["id"], attribute=saved.id
-                                        ),
-                                    )
-                            value["saved_id"] = saved.id
-                            value["saved"] = saved
+    def save_attributes(self, attributes_to_sync: list[dict[str, Any]]) -> None:
+        self.ordercast_api.upsert_attributes(
+            request=[
+                UpsertAttributesRequest(
+                    code=str(attribute["id"]), name=attribute["name"]
+                )  # TODO: fix code
+                for attribute in attributes_to_sync
+            ]
+        )
 
     def save_product_variants(
         self,

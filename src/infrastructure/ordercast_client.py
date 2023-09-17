@@ -18,6 +18,7 @@ from src.api import (
     ListMerchantsRequest,
     UpsertProductsRequest,
     UpsertCategoriesRequest,
+    UpsertAttributesRequest,
 )
 from src.api import (
     OrdercastApiValidationException,
@@ -118,10 +119,10 @@ class OrdercastApi:
         )
 
     @error_handler
-    def upsert_attributes(self, attributes) -> Response:
+    def upsert_attributes(self, request: list[UpsertAttributesRequest]) -> Response:
         return httpx.post(
             url=f"{self.base_url}/attribute/",
-            data=attributes,
+            json=[model.model_dump() for model in request],
             headers=self._auth_headers,
         )
 

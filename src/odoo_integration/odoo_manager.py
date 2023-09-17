@@ -578,83 +578,95 @@ class OdooManager:
             "objects": result,
         }
 
-    def get_categories(self, from_date=Optional[datetime]) -> dict[str, Any]:
+    def get_categories(self, from_date: Optional[datetime] = None) -> dict[str, Any]:
         categories = self.get_remote_updated_objects(
             "product.public.category", from_date=from_date, i18n_fields=["name"]
         )
-        result = []
-        for category in categories:
-            category_dto = {
+
+        parent_codes = {
+            parent["id"]: parent["name"]
+            for parent in categories
+            if not parent["parent_id"]
+        }
+
+        result = [
+            {
                 "id": category["id"],
                 "_remote_id": category["id"],
                 "name": category["name"],
+                **get_i18n_field_as_dict(category, "name"),
+                "parent": self._client.get_object(category["parent_id"])[0]
+                if category["parent_id"]
+                else None,
+                "groups": self._client.get_object(category["product_tmpl_ids"])
+                if category["product_tmpl_ids"]
+                else None,
+                "child": self._client.get_object(category["child_id"])
+                if category["child_id"]
+                else None,
+                "parent_code": parent_codes[category["parent_id"][0]]
+                if category["parent_id"]
+                else "root",
             }
-            i18n_fields = get_i18n_field_as_dict(category, "name")
-            category_dto.update(i18n_fields)
-            if category["parent_id"] and len(category["parent_id"]):
-                category_dto["parent"] = self._client.get_object(category["parent_id"])
-            if category["product_tmpl_ids"] and len(category["product_tmpl_ids"]) > 0:
-                category_dto["groups"] = self._client.get_object(
-                    category["product_tmpl_ids"]
-                )
-            if category["child_id"] and len(category["child_id"]) > 0:
-                category_dto["child"] = self._client.get_object(category["child_id"])
-            result.append(category_dto)
+            for category in categories
+        ]
+
         return {
-            "all_ids": self._client.get_all_object_ids("product.public.category")(),
+            "all_ids": self._client.get_all_object_ids("product.public.category"),
             "objects": result,
         }
 
     def get_product_attributes(
-        self, from_date=Optional[datetime], attribute_from_date=None
+        self, from_date: Optional[datetime] = None, attribute_from_date=None
     ):
         attributes = self.get_remote_updated_objects(
             "product.attribute", from_date=from_date, i18n_fields=["name"]
         )
+
         attribute_values = self.get_remote_updated_objects(
             "product.attribute.value",
             from_date=attribute_from_date,
             i18n_fields=["name"],
         )
+
         result = []
+
         if attributes:
             for attribute in attributes:
                 attribute_dto = {"id": attribute["id"], "name": attribute["name"]}
-                i18n_fields = get_i18n_field_as_dict(attribute, "name")
-                attribute_dto.update(i18n_fields)
-                if (
-                    attribute["product_tmpl_ids"]
-                    and len(attribute["product_tmpl_ids"]) > 0
-                ):
+                attribute_dto.update(get_i18n_field_as_dict(attribute, "name"))
+
+                if attribute["product_tmpl_ids"]:
                     attribute_dto["groups"] = self._client.get_object(
                         attribute["product_tmpl_ids"]
                     )
+
                 result.append(attribute_dto)
 
         if attribute_values:
             for attribute_value in attribute_values:
                 attribute_id = attribute_value["attribute_id"]
+
                 if (
                     attribute_id
-                    and type(attribute_id) == list
+                    and isinstance(attribute_id, list)
                     and len(attribute_id) > 1
                 ):
                     for attribute in result:
                         if "id" in attribute and attribute["id"] == attribute_id[0]:
-                            if "values" not in attribute:
-                                attribute["values"] = []
+                            attribute.setdefault("values", [])
                             attribute_value_dto = {
                                 "id": attribute_value["id"],
                                 "name": attribute_value["name"],
                                 "position": attribute_value["sequence"],
                             }
-                            i18n_fields = get_i18n_field_as_dict(
-                                attribute_value, "name"
+                            attribute_value_dto.update(
+                                get_i18n_field_as_dict(attribute_value, "name")
                             )
-                            attribute_value_dto.update(i18n_fields)
                             attribute["values"].append(attribute_value_dto)
                 else:
                     print(f"There is no attribute for value {attribute_value}")
+
         return {
             "all_ids": self._client.get_all_object_ids("product.attribute"),
             "objects": result,

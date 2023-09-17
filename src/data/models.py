@@ -28,7 +28,8 @@ class OdooProductVariant(OdooCommons):
 
 
 class OdooAttribute(OdooCommons):
-    attribute: PositiveInt
+    name: str
+    attribute: Optional[PositiveInt] = None
 
 
 class OdooOrder(OdooCommons):
