@@ -12,6 +12,7 @@ from .ordercast_api_requests import (
     UpsertProductsRequest,
     UpsertCategoriesRequest,
     UpsertAttributesRequest,
+    Merchant,
 )
 
 __all__ = (
@@ -29,4 +30,5 @@ __all__ = (
     "UpsertProductsRequest",
     "UpsertCategoriesRequest",
     "UpsertAttributesRequest",
+    "Merchant",
 )

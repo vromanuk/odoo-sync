@@ -362,7 +362,7 @@ class OdooManager:
         )
         return send_partner
 
-    def get_products(self, from_date: Optional[datetime]) -> dict[str, Any]:
+    def get_products(self, from_date: Optional[datetime] = None) -> dict[str, Any]:
         products = self.get_remote_updated_objects(
             "product.template",
             from_date=from_date,

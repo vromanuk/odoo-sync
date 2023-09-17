@@ -16,6 +16,7 @@ from src.api import (
     UpsertProductsRequest,
     UpsertCategoriesRequest,
     UpsertAttributesRequest,
+    Merchant,
 )
 from src.data import (
     OdooProductVariant,
@@ -62,18 +63,20 @@ class OrdercastManager:
         self.ordercast_api.bulk_signup(
             [
                 BulkSignUpRequest(
-                    erp_id=user["erp_id"],
-                    name=user["name"],
-                    phone=user["phone"],
-                    city=user["city"],
-                    sector_id=user.get("sector_id", default_sector_id),
-                    postcode=user["postcode"],
-                    street=user["street"],
-                    vat=user["vat"],
-                    website=user["website"],
-                    info=user["info"],
-                    corporate_status_id=user.get("corporate_status_id", 1),
-                    country_alpha_2=user.get("country_alpha_2", "GB"),
+                    merchant=Merchant(
+                        erp_id=user["erp_id"],
+                        name=user["name"],
+                        phone=user["phone"],
+                        city=user["city"],
+                        sector_id=user.get("sector_id", default_sector_id),
+                        postcode=user["postcode"],
+                        street=user["street"],
+                        vat=user["vat"],
+                        website=user["website"],
+                        info=user["info"],
+                        corporate_status_id=user.get("corporate_status_id", 1),
+                        country_alpha_2=user.get("country_alpha_2", "GB"),
+                    )
                 )
                 for user in users_to_sync
             ]

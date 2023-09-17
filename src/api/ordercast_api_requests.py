@@ -9,7 +9,7 @@ class ImageObject(BaseModel):
     url: str
 
 
-class BulkSignUpRequest(BaseModel):
+class Merchant(BaseModel):
     erp_id: PositiveInt
     name: str
     phone: str
@@ -22,6 +22,10 @@ class BulkSignUpRequest(BaseModel):
     info: str = ""
     corporate_status_id: int = 1
     country_alpha_2: str = "GB"
+
+
+class BulkSignUpRequest(BaseModel):
+    merchant: Merchant
 
 
 class CreateShippingAddressRequest(BaseModel):
@@ -94,11 +98,11 @@ class UpsertProductsRequest(BaseModel):
 
 
 class UpsertCategoriesRequest(BaseModel):
-    image: Optional[ImageObject] = None
     name: str
     parent_id: Optional[PositiveInt]
     parent_code: str
     index: PositiveInt
+    image: Optional[ImageObject] = None
     code: str = ""
 
 
