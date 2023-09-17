@@ -43,14 +43,10 @@ class Partner:
             partner_dto["type"] = partner["type"]
         if is_not_empty(partner, "parent_id"):
             partner_dto["parent_id"] = odoo_client.get_object_id(partner["parent_id"])
-        # if partner['country_id']:
-        #     remote_country = remote_country_obj.search_read([('id', '=', partner['country_id'])])
-        #     if remote_country:
-        #         partner_dto["country_name"] = remote_country['name']
         if is_not_empty(partner, "country_code"):
             partner_dto["country_code"] = partner["country_code"]
         if is_not_empty(partner, "state_id"):
-            if type(partner["state_id"]) == list and len(partner["state_id"]) == 2:
+            if isinstance(partner["state_id"], list) and len(partner["state_id"]) == 2:
                 partner_dto["state_name"] = partner["state_id"][1]
         if is_not_empty(partner, "vat"):
             partner_dto["vat"] = partner["vat"]

@@ -146,6 +146,12 @@ class OrdercastManager:
 
         return sectors[0]["id"]
 
+    def get_catalog(self) -> int:
+        response = self.ordercast_api.list_catalogs()
+        catalogs = response.json()
+
+        return catalogs[0]["id"]
+
     def get_address(self, address, odoo_repo: OdooRepo):
         if address:
             address_dto = {
@@ -179,10 +185,14 @@ class OrdercastManager:
             return address_dto
 
     def save_products(self, products: list[dict[str, Any]]) -> None:
+        default_catalog = self.get_catalog()
         self.ordercast_api.upsert_products(
             request=[
                 UpsertProductsRequest(
-                    name=product["name"], sku="", catalogs=[], categories=[]
+                    name=product["names"],
+                    sku=product.get("sku", product["name"]),
+                    catalogs=[{"catalog_id": default_catalog}],
+                    categories=[{"category_id": product["category"]}],
                 )
                 for product in products
             ]
@@ -339,7 +349,7 @@ class OrdercastManager:
             ):
                 product_categories = product_variant["category"]
                 saved_product.categories = None
-                if type(product_categories) == list:
+                if isinstance(product_categories, list):
                     for product_category in product_categories:
                         for category in categories:
                             if category["id"] == product_category:
@@ -433,7 +443,7 @@ class OrdercastManager:
 
             def get_discount():
                 result = price_discounts
-                if type(price_discounts) == list:
+                if isinstance(price_discounts, list):
                     if len(price_discounts) >= counter + 1:
                         result = price_discounts[counter]
                     else:

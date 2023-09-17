@@ -1,4 +1,5 @@
 import re
+from collections import defaultdict
 from typing import Any
 
 import regex as regexp
@@ -116,3 +117,25 @@ def check_remote_id(dto):
     if "_remote_id" not in dto:
         msg = f"Not remote id found for {dto['id']}. Please check it."
         raise SyntaxError(msg)
+
+
+def get_entity_translated_names(entities: list[dict[str, Any]]) -> dict[int, Any]:
+    """
+    Transforms entities with translated names into a dictionary mapping entity IDs to language-specific names.
+
+    :param entities: List of dictionaries with keys like "name_language" (e.g., "name_de" for German).
+                     Values are the translated names in respective languages.
+                     Example: {"name_de": "German Name", "name_fr": "French Name"}
+
+    :return: Dictionary where each entity ID maps to language-to-name mappings.
+             Example: {1: {"de": "German Name", "fr": "French Name"},
+                       2: {"de": "German Name 2", "fr": "French Name 2"}, ...}
+    """
+    entities_names = defaultdict(dict)
+    for entity in entities:
+        for k, v in entity.items():
+            if k.startswith("name_"):
+                _, language = k.split("_")
+                entities_names[entity["id"]][language] = v
+
+    return entities_names

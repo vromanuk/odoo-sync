@@ -15,6 +15,7 @@ class OdooCommons(BaseModel):
 
 
 class OdooProduct(OdooCommons):
+    name: str
     product: Optional[PositiveInt] = None
 
 

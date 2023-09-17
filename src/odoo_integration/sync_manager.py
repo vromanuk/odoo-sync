@@ -181,6 +181,8 @@ class SyncManager:
                     "name": product["name"],
                     "is_removed": False,
                     "i18n_fields": get_i18n_field_as_dict(product, "name"),
+                    "names": product["names"],
+                    "category": product["categ_id"][0],
                 }
                 for product in products["objects"]
             ]
@@ -189,9 +191,7 @@ class SyncManager:
             self.repo.insert_many(
                 key=RedisKeys.PRODUCTS,
                 entities=[
-                    OdooProduct(
-                        odoo_id=product["erp_id"],
-                    )
+                    OdooProduct(odoo_id=product["erp_id"], name=product["name"])
                     for product in products_to_sync
                 ],
             )

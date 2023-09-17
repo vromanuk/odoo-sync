@@ -91,10 +91,10 @@ class CreateBillingAddressRequest(BaseModel):
 
 class UpsertProductsRequest(BaseModel):
     image: Optional[ImageObject] = {}
-    name: str
+    name: dict[str, str]
     sku: str
-    catalogs: list[PositiveInt]
-    categories: list[PositiveInt]
+    catalogs: list[dict[str, PositiveInt]]
+    categories: list[dict[str, PositiveInt]]
 
 
 class UpsertCategoriesRequest(BaseModel):

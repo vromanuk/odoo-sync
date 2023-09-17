@@ -1,4 +1,3 @@
-from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Annotated, Optional, Any
 
@@ -17,7 +16,13 @@ from src.data import (
 )
 from src.infrastructure import OdooClient, get_odoo_client
 from .exceptions import OdooSyncException
-from .helpers import is_empty, is_not_empty, get_i18n_field_as_dict, check_remote_id
+from .helpers import (
+    is_empty,
+    is_not_empty,
+    get_i18n_field_as_dict,
+    check_remote_id,
+    get_entity_translated_names,
+)
 from .odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
 from .partner import Partner
 
@@ -371,10 +376,16 @@ class OdooManager:
             filter_criteria=[("is_published", "=", True), ("list_price", ">", 0.0)],
         )
 
+        product_names = get_entity_translated_names(products)
+
         result = []
 
         for product in products:
-            group_dto = {"id": product["id"], "_remote_id": product["id"]}
+            group_dto = {
+                "id": product["id"],
+                "_remote_id": product["id"],
+                "names": product_names[product["id"]],
+            }
             i18n_fields = get_i18n_field_as_dict(product, "name")
             group_dto.update(i18n_fields)
 
@@ -384,6 +395,7 @@ class OdooManager:
                 "barcode",
                 "default_code",
                 "image_1920",
+                "categ_id",
             ]:
                 if product[field_name]:
                     group_dto[field_name] = product[field_name]
@@ -408,7 +420,7 @@ class OdooManager:
         filter_criteria=None,
     ):
         api_filter_criteria = []
-        if filter_criteria and type(filter_criteria) == list:
+        if filter_criteria and isinstance(filter_criteria, list):
             api_filter_criteria.extend(filter_criteria)
 
         if sync_from_last_time and object_external:
@@ -449,7 +461,9 @@ class OdooManager:
             )
         return remote_objects
 
-    def get_product_variants(self, from_date=Optional[datetime]):
+    def get_product_variants(
+        self, from_date: Optional[datetime] = None
+    ) -> dict[str, Any]:
         product_variants = self.get_remote_updated_objects(
             "product.product",
             from_date=from_date,
@@ -459,11 +473,13 @@ class OdooManager:
         product_template_attributes = self.get_remote_updated_objects(
             "product.template.attribute.value", i18n_fields=["name"]
         )
+
         discounts = self._client.get_discounts()
 
         def get_attribute(attribute_ids):
+            # Helper function to retrieve attribute values
+            result_ids = []
             if product_template_attributes and attribute_ids:
-                result_ids = []
                 for attribute in product_template_attributes:
                     if "id" in attribute and attribute["id"] in attribute_ids:
                         result_ids.extend(
@@ -471,106 +487,62 @@ class OdooManager:
                                 attribute["product_attribute_value_id"]
                             )
                         )
-                return result_ids
+            return result_ids
 
         result = []
         for product_variant in product_variants:
             product_variant_dto = {
                 "id": product_variant["id"],
                 "_remote_id": product_variant["id"],
-                "name": product_variant["display_name"],
+                "name": product_variant.get(
+                    "display_name", product_variant.get("code")
+                ),
             }
-            i18n_fields = get_i18n_field_as_dict(product_variant, "display_name")
-            product_variant_dto.update(i18n_fields)
 
+            # Assign additional attributes based on existence
+            for field in [
+                "barcode",
+                "code",
+                "partner_ref",
+                "lst_price",
+                "list_price",
+                "image_1920",
+                "volume",
+                "volume_uom_name",
+                "weight",
+                "weight_uom_name",
+                "color",
+                "uom_name",
+                "base_unit_count",
+                "base_unit_price",
+                "product_template_attribute_value_ids",
+                "public_categ_ids",
+                "product_tmpl_id",
+                "product_variant_ids",
+                "attribute_line_ids",
+            ]:
+                if field in product_variant and product_variant[field]:
+                    product_variant_dto[field] = product_variant[field]
+
+            # Assign discounts if available
             if discounts:
                 product_variant_dto["price_discounts"] = discounts
 
-            if "barcode" in product_variant and product_variant["barcode"]:
-                product_variant_dto["barcode"] = product_variant["barcode"]
-            if "display_name" in product_variant and product_variant["display_name"]:
-                product_variant_dto["display_name"] = product_variant["display_name"]
-            if "code" in product_variant and product_variant["code"]:
-                product_variant_dto["code"] = product_variant["code"]
-            if "partner_ref" in product_variant and product_variant["partner_ref"]:
-                product_variant_dto["ref"] = product_variant["partner_ref"]
-            if "lst_price" in product_variant and product_variant["lst_price"]:
-                product_variant_dto["price"] = product_variant["lst_price"]
-            elif "list_price" in product_variant and product_variant["list_price"]:
-                logger.warn(
-                    f"Product '{product_variant['display_name']}' has no 'lst_price' so setting 'list_price'."
-                )
-                product_variant_dto["price"] = product_variant["list_price"]
-            if "image_1920" in product_variant and product_variant["image_1920"]:
-                product_variant_dto["image"] = product_variant["image_1920"]
-            if "volume" in product_variant and product_variant["volume"]:
-                product_variant_dto["attr_volume"] = product_variant["volume"]
-            if (
-                "volume_uom_name" in product_variant
-                and product_variant["volume_uom_name"]
-            ):
-                product_variant_dto["attr_volume_name"] = product_variant[
-                    "volume_uom_name"
-                ]
-            if "weight" in product_variant and product_variant["weight"]:
-                product_variant_dto["attr_weight"] = product_variant["weight"]
-            if (
-                "weight_uom_name" in product_variant
-                and product_variant["weight_uom_name"]
-            ):
-                product_variant_dto["attr_weight_name"] = product_variant[
-                    "weight_uom_name"
-                ]
-            if "color" in product_variant and product_variant["color"]:
-                product_variant_dto["attr_color"] = product_variant["color"]
-            if "uom_name" in product_variant and product_variant["uom_name"]:
-                product_variant_dto["attr_unit"] = product_variant["uom_name"]
-            if (
-                "base_unit_count" in product_variant
-                and product_variant["base_unit_count"]
-            ):
-                product_variant_dto["unit_count"] = product_variant["base_unit_count"]
-            if (
-                "base_unit_price" in product_variant
-                and product_variant["base_unit_price"]
-            ):
-                product_variant_dto["unit_price"] = product_variant["base_unit_price"]
-            if (
-                "product_template_attribute_value_ids" in product_variant
-                and product_variant["product_template_attribute_value_ids"]
-            ):
+            # Assign attribute values
+            if "product_template_attribute_value_ids" in product_variant:
                 product_variant_dto["attribute_values"] = get_attribute(
                     product_variant["product_template_attribute_value_ids"]
                 )
-            if (
-                product_variant["public_categ_ids"]
-                and len(product_variant["public_categ_ids"]) > 0
-            ):
-                product_variant_dto["category"] = self._client.get_object(
-                    product_variant["public_categ_ids"]
-                )
-            if (
-                product_variant["product_tmpl_id"]
-                and len(product_variant["product_tmpl_id"]) > 0
-            ):
-                product_variant_dto["group"] = self._client.get_object(
-                    product_variant["product_tmpl_id"]
-                )
-            if (
-                product_variant["product_variant_ids"]
-                and len(product_variant["product_variant_ids"]) > 0
-            ):
-                product_variant_dto["product_variant"] = self._client.get_object(
-                    product_variant["product_variant_ids"]
-                )
-            if (
-                product_variant["attribute_line_ids"]
-                and len(product_variant["attribute_line_ids"]) > 0
-            ):
-                product_variant_dto["attr_dynamic"] = self._client.get_object(
-                    product_variant["attribute_line_ids"]
-                )
+
+            # Assign categories and groups if available
+            for field in ["public_categ_ids", "product_tmpl_id", "product_variant_ids"]:
+                if field in product_variant and product_variant[field]:
+                    product_variant_dto[field[:-4]] = self._client.get_object(
+                        product_variant[field]
+                    )
+
             result.append(product_variant_dto)
+
         return {
             "all_ids": self._client.get_all_object_ids(
                 "product.product",
@@ -590,12 +562,7 @@ class OdooManager:
             if not parent["parent_id"]
         }
 
-        category_names = defaultdict(dict)
-        for category in categories:
-            for k, v in category.items():
-                if k.startswith("name_"):
-                    _, language = k.split("_")
-                    category_names[category["id"]][language] = v
+        category_names = get_entity_translated_names(categories)
 
         result = [
             {
