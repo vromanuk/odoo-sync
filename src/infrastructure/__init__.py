@@ -15,6 +15,7 @@ from .ordercast_api_requests import (
     UpsertProductVariantsRequest,
     UpsertUnitsRequest,
     I18Name,
+    ListProductsRequest,
 )
 from .ordercast_client import OrdercastApi, get_ordercast_api
 from .redis_client import RedisClient, get_redis_client
@@ -41,4 +42,5 @@ __all__ = (
     "UpsertProductVariantsRequest",
     "UpsertUnitsRequest",
     "I18Name",
+    "ListProductsRequest",
 )

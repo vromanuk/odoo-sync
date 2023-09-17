@@ -1,7 +1,7 @@
 import secrets
 from typing import Any
 
-from src.data import UserStatus
+from src.data import UserStatus, OrdercastProduct
 from .helpers import is_empty, get_i18n_field_as_dict
 
 
@@ -61,53 +61,38 @@ def get_product_data(product: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def get_product_variant_data(product_variant: dict[str, Any]) -> dict[str, Any]:
+def get_product_variant_data(
+    product_variant: dict[str, Any],
+    odoo_products: list[dict[str, Any]],
+    ordercast_products: list[OrdercastProduct],
+) -> dict[str, Any]:
+    ordercast_sku_to_id_mapper = {p.sku: p.id for p in ordercast_products}
+    product_mapper = {
+        p["id"]: ordercast_sku_to_id_mapper[p["name"]]
+        for p in odoo_products
+        if p["name"] in ordercast_sku_to_id_mapper
+    }
     remote_id = product_variant["id"]
 
     i18n_fields = get_i18n_field_as_dict(
         product_variant, "display_name", "name", r"^\[.*] ?"
     )
 
-    name = product_variant["display_name"]
-    ref = product_variant["code"]
-    price = None
-    if "price" in product_variant:
-        price = product_variant["price"]
-    pack = 1
-    if "unit_count" in product_variant:
-        pack = product_variant["unit_count"]
-    unit_name = None
-    if "attr_unit" in product_variant:
-        unit_name = product_variant["attr_unit"]
-
-    barcode = ""
-    if "barcode" in product_variant:
-        barcode = product_variant["barcode"]
-
-    group = None
-    if (
-        products
-        and "group" in product_variant
-        and product_variant["group"]
-        and len(product_variant["group"]) > 0
-    ):
-        group_id = product_variant["group"][0]
-        for saved_groups in products:
-            if saved_groups["id"] == group_id:
-                group = saved_groups["saved"]
-                break
-
     defaults = {
         "id": remote_id,
-        "name": name,
-        "pack": pack,
-        "group": group,
-        "unit": unit_name,
-        "barcode": barcode,
-        "ref": ref,
-        "price": price,
+        "name": product_variant["display_name"],
+        "pack": product_variant.get("unit_count", 1),
+        "product_id": product_mapper.get(
+            product_variant["group"][0], product_variant["group"][0]
+        ),
+        "unit": product_variant.get("attr_unit"),
+        "barcode": product_variant.get("barcode", ""),
+        "ref": product_variant["code"],
+        "price": product_variant.get("price"),
+        "is_removed": False,
+        "names": product_variant["names"],
+        "sku": product_variant["code"],
     }
     defaults.update(i18n_fields)
-    defaults["is_removed"] = False
 
     return defaults

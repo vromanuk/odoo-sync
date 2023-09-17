@@ -12,6 +12,7 @@ from src.data import (
     OrderStatus,
     Locale,
     OrdercastMerchant,
+    OrdercastProduct,
 )
 from src.infrastructure import (
     OrdercastApi,
@@ -31,6 +32,7 @@ from src.infrastructure import (
     UpsertProductVariantsRequest,
     UpsertUnitsRequest,
     I18Name,
+    ListProductsRequest,
 )
 from .helpers import (
     get_i18n_field_as_dict,
@@ -150,6 +152,16 @@ class OrdercastManager:
         catalogs = response.json()
 
         return catalogs[0]["id"]
+
+    def get_products(self) -> list[OrdercastProduct]:
+        logger.info("Receiving products from Ordercast")
+        # TODO: handle pagination
+        response = self.ordercast_api.get_products(request=ListProductsRequest())
+        products = response.json()["items"]
+        return [
+            OrdercastProduct(id=product["id"], sku=product["sku"])
+            for product in products
+        ]
 
     def get_address(self, address, odoo_repo: OdooRepo):
         if address:

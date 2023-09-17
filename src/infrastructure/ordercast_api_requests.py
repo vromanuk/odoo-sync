@@ -58,10 +58,18 @@ class ListShippingAddressesRequest(BaseModel):
     merchant_id: PositiveInt
 
 
-class ListMerchantsRequest(BaseModel):
+class BasePaginatedRequest(BaseModel):
     pageIndex: PositiveInt = 0
     pageSize: PositiveInt = 50
     prevId: PositiveInt = 0
+
+
+class ListMerchantsRequest(BasePaginatedRequest):
+    pass
+
+
+class ListProductsRequest(BasePaginatedRequest):
+    pass
 
 
 class CreateOrderRequest(BaseModel):

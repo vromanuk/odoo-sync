@@ -27,6 +27,7 @@ from .ordercast_api_requests import (
     UpsertAttributesRequest,
     UpsertProductVariantsRequest,
     UpsertUnitsRequest,
+    ListProductsRequest,
 )
 
 logger = structlog.getLogger(__name__)
@@ -204,6 +205,13 @@ class OrdercastApi:
     def list_catalogs(self) -> Response:
         return httpx.get(
             url=f"{self.base_url}/catalog/",
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def get_products(self, request: ListProductsRequest) -> Response:
+        return httpx.get(
+            url=f"{self.base_url}/product/?pageIndex={request.pageIndex}&pageSize={request.pageSize}&prevId={request.prevId}",
             headers=self._auth_headers,
         )
 

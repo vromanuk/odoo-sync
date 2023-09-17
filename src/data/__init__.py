@@ -20,7 +20,7 @@ from .models import (
     OdooCategory,
     CategoryType,
 )
-from .ordercast_models import OrdercastMerchant
+from .ordercast_models import OrdercastMerchant, OrdercastProduct
 from .typings import OdooEntity
 
 __all__ = (
@@ -42,6 +42,7 @@ __all__ = (
     "InvoiceStatus",
     "Locale",
     "OrdercastMerchant",
+    "OrdercastProduct",
     "OdooCategory",
     "CategoryType",
 )

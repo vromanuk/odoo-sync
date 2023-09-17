@@ -106,14 +106,11 @@ class SyncManager:
             self.ordercast_manager.create_shipping_address(partner)
 
     def sync_products(self, full_sync: bool = False) -> None:
-        categories = self.sync_categories_to_ordercast()
-        attributes = self.sync_attributes_to_ordercast()
+        self.sync_categories_to_ordercast()
+        self.sync_attributes_to_ordercast()
         products = self.sync_products_to_ordercast(full_sync=full_sync)
         self.sync_product_variants_to_ordercast(
-            categories=categories,
-            products=products,
-            attributes=attributes,
-            full_sync=full_sync,
+            full_sync=full_sync, products=products["objects"]
         )
 
     def sync_categories_to_ordercast(self) -> dict[str, Any]:
@@ -202,9 +199,7 @@ class SyncManager:
 
     def sync_product_variants_to_ordercast(
         self,
-        categories: dict[str, Any],
-        products: dict[str, Any],
-        attributes: dict[str, Any],
+        products: list[dict[str, Any]],
         full_sync: bool = False,
     ) -> None:
         last_sync_date = (
@@ -226,7 +221,11 @@ class SyncManager:
             )
             units = self.odoo_manager.get_units()
             product_variants_to_sync = [
-                get_product_variant_data(product_variant)
+                get_product_variant_data(
+                    product_variant=product_variant,
+                    odoo_products=products,
+                    ordercast_products=self.ordercast_manager.get_products(),
+                )
                 for product_variant in product_variants["objects"]
             ]
 
