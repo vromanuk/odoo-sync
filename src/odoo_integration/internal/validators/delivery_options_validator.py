@@ -1,3 +1,5 @@
+from typing import Any
+
 import structlog
 
 from ..exceptions import OdooSyncException
@@ -11,7 +13,12 @@ from ..helpers import (
 logger = structlog.getLogger(__name__)
 
 
-def validate_delivery_options(delivery_options) -> None:
+def validate_delivery_options(delivery_options: dict[str, Any]) -> None:
+    delivery_options = delivery_options["objects"]
+
+    if not delivery_options:
+        return
+
     unique_names_dict = {}
     has_error = False
     for delivery_option in delivery_options:

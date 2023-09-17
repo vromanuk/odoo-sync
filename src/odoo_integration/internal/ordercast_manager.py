@@ -5,7 +5,6 @@ import structlog
 from fastapi import Depends
 
 from src.data import (
-    OdooProductVariant,
     OdooDeliveryOption,
     OdooWarehouse,
     OdooOrder,
@@ -29,17 +28,16 @@ from src.infrastructure import (
     UpsertCategoriesRequest,
     UpsertAttributesRequest,
     Merchant,
+    UpsertProductVariantsRequest,
+    UpsertUnitsRequest,
+    I18Name,
 )
-from .exceptions import OdooSyncException
 from .helpers import (
-    is_length_not_in_range,
     get_i18n_field_as_dict,
     exists_in_all_ids,
-    str_to_int,
 )
 from .odoo_repo import OdooRepo, RedisKeys
 from .validators import (
-    validate_delivery_options,
     validate_warehouses,
 )
 
@@ -224,345 +222,26 @@ class OrdercastManager:
         )
 
     def save_product_variants(
-        self,
-        categories: dict[str, Any],
-        products: dict[str, Any],
-        attributes: dict[str, Any],
-        product_variants: dict[str, Any],
+        self, product_variants: list[dict[str, Any]], units: list[dict[str, Any]]
     ) -> None:
-        categories = categories["objects"]
-        products = products["objects"]
-        product_variants = product_variants["objects"]
-        attributes = attributes["objects"]
-        product_variants = sorted(product_variants, key=lambda d: d["display_name"])
-
-        saved_product_variants_ids = []
-        for product_variant in product_variants:
-            remote_id = product_variant["id"]
-
-            i18n_fields = get_i18n_field_as_dict(
-                product_variant, "display_name", "name", r"^\[.*] ?"
-            )
-
-            name = product_variant["display_name"]
-            ref = product_variant["code"]
-            price = None
-            if "price" in product_variant:
-                price = product_variant["price"]
-            pack = 1
-            if "unit_count" in product_variant:
-                pack = product_variant["unit_count"]
-            unit_name = None
-            if "attr_unit" in product_variant:
-                unit_name = product_variant["attr_unit"]
-
-            barcode = ""
-            if "barcode" in product_variant:
-                barcode = product_variant["barcode"]
-                if is_length_not_in_range(barcode, 1, 24):
-                    raise OdooSyncException(
-                        f"Received product barcode '{barcode}' has more than max 24 symbols. Please correct it in Odoo."
-                    )
-
-            unit = None
-            if unit_name:
-                # unit, is_new = Unit.objects.update_or_create(name=unit_name.upper(), hint=unit_name)
-                unit = self.ordercast_api.upsert_units()
-
-            group = None
-            if (
-                products
-                and "group" in product_variant
-                and product_variant["group"]
-                and len(product_variant["group"]) > 0
-            ):
-                group_id = product_variant["group"][0]
-                for saved_groups in products:
-                    if saved_groups["id"] == group_id:
-                        group = saved_groups["saved"]
-                        break
-
-            defaults = {
-                "name": name,
-                "pack": pack,
-                "group": group,
-                "unit": unit,
-                "barcode": barcode,
-            }
-            defaults.update(i18n_fields)
-            defaults["is_removed"] = False
-
-            # odoo_product = ProductExternal.objects.filter(odoo_id=remote_id).first()
-            odoo_product = odoo_repo.get(
-                key=RedisKeys.PRODUCT_VARIANTS, entity_id=remote_id
-            )
-            if odoo_product:
-                defaults["ref"] = ref
-                # saved_product, _ = Product.all_objects.update_or_create(id=odoo_product.product.id,
-                #                                                         defaults=defaults)
-                saved_product = self.ordercast_api.upsert_products(
-                    id=odoo_product.product.id, defaults=defaults
-                )
-            else:
-                # saved_product = Product.all_objects.update_or_create(ref=ref, defaults=defaults)
-                saved_product = self.ordercast_api.upsert_products(
-                    ref=ref, defaults=defaults
-                )
-                # existing_odoo_product = ProductExternal.objects.filter(product__id=saved_product.id).first()
-                existing_odoo_product = odoo_repo.get(
-                    key=RedisKeys.PRODUCT_VARIANTS, entity_id=saved_product.id
-                )
-
-                if existing_odoo_product:
-                    if not exists_in_all_ids(
-                        existing_odoo_product.odoo_id, product_variants
-                    ):
-                        existing_odoo_product.odoo_id = remote_id
-                        existing_odoo_product.save()
-                    elif existing_odoo_product.odoo_id != remote_id:
-                        logger.warn(
-                            f"There is more than one '{name}' product {[existing_odoo_product.odoo_id, remote_id]} in Odoo, so the first '{existing_odoo_product.odoo_id}'is used. "
-                            f"Please inform Odoo administrators that products should be unified and stored only in one instance."
-                        )
-                        existing_odoo_product.save()
-                    # self.remove_duplicate_object_id(remote_id, products_dict)
-                else:
-                    # ProductExternal.objects.update_or_create(product_id=saved_product.id, odoo_id=remote_id)
-                    odoo_repo.insert(
-                        key=RedisKeys.PRODUCT_VARIANTS,
-                        entity=OdooProductVariant(
-                            odoo_id=remote_id, product=saved_product.id
-                        ),
-                    )
-
-            # clear current categories and attributes.
-            saved_product.category_products.all().delete()
-            saved_product.attributes.all().delete()
-
-            product_variant["saved_id"] = saved_product.id
-            product_variant["saved"] = saved_product
-
-            if (
-                categories
-                and "category" in product_variant
-                and product_variant["category"]
-                and len(product_variant["category"]) > 0
-            ):
-                product_categories = product_variant["category"]
-                saved_product.categories = None
-                if isinstance(product_categories, list):
-                    for product_category in product_categories:
-                        for category in categories:
-                            if category["id"] == product_category:
-                                saved_category = category["saved"]
-                                saved_category.products.add(saved_product)
-                                saved_category.save()
-                                if saved_product.categories is None:
-                                    saved_product.categories = []
-                                if saved_category.code not in saved_product.categories:
-                                    saved_product.categories.append(saved_category.code)
-                                    saved_product.save()
-                                break
-            if (
-                attributes
-                and "attribute_values" in product_variant
-                and len(product_variant["attribute_values"]) > 0
-            ):
-                product_attribute_values = product_variant["attribute_values"]
-                for product_attribute_value in product_attribute_values:
-                    found = False
-                    for attribute in attributes:
-                        if "values" in attribute:
-                            for attribute_value in attribute["values"]:
-                                if (
-                                    "id" in attribute_value
-                                    and product_attribute_value == attribute_value["id"]
-                                ):
-                                    if (
-                                        "saved" in attribute
-                                        and "saved" in attribute_value
-                                    ):
-                                        (
-                                            saved_product_attribute,
-                                            is_new,
-                                        ) = ProductAttribute.objects.update_or_create(
-                                            product=product_variant["saved"],
-                                            category=attribute["saved"],
-                                            attribute=attribute_value["saved"],
-                                        )
-                                        if (
-                                            "saved_product_attribute_ids"
-                                            not in product_variant
-                                        ):
-                                            product_variant[
-                                                "saved_product_attribute_ids"
-                                            ] = []
-                                        if (
-                                            "saved_product_attributes"
-                                            not in product_variant
-                                        ):
-                                            product_variant[
-                                                "saved_product_attributes"
-                                            ] = []
-
-                                        product_variant[
-                                            "saved_product_attribute_ids"
-                                        ].append(saved_product_attribute.id)
-                                        product_variant[
-                                            "saved_product_attributes"
-                                        ].append(saved_product_attribute)
-
-                                        # if saved_product:
-                                        #     if saved_product.attributes is None:
-                                        #         saved_product.attributes = []
-                                        #     if saved_product_attribute.id not in saved_product.attributes:
-                                        #         saved_product.attributes.append(saved_product_attribute)
-                                        #         saved_product.save()
-                                        found = True
-                                        break
-                                    else:
-                                        logger.error(
-                                            f"Attribute {attribute['name']} or value {attribute_value['name']} is not saved."
-                                        )
-                        if found:
-                            break
-
-            if "image" in product_variant:
-                self.save_image(
-                    saved_product.pk, product_variant["image"], saved_product.image
-                )
-            elif saved_product.image:
-                self.delete_file(saved_product.image)
-
-            saved_product.update_search_vector()
-            product_variant["saved"] = saved_product
-            saved_product_variants_ids.append(saved_product.id)
-            counter = 0
-            price_discounts = product_variant["price_discounts"]
-            if price_discounts:
-                price_discounts = price_discounts.split(";")
-
-            def get_discount():
-                result = price_discounts
-                if isinstance(price_discounts, list):
-                    if len(price_discounts) >= counter + 1:
-                        result = price_discounts[counter]
-                    else:
-                        result = 0
-                return str_to_int(result, 0)
-
-            def get_discounted_price():
-                discount = get_discount()
-                result = price - price * discount / 100
-                return result
-
-            # TODO: price_rate
-            for tariff in TariffGroup.objects.all().order_by("name"):
-                discounted_price = get_discounted_price()
-                price_saved, price_is_new = ProductPrice.objects.update_or_create(
-                    product=saved_product,
-                    tariff=tariff,
-                    defaults={"price": discounted_price},
-                )
-                counter += 1
-
-        # set grouper field for the products
-        if saved_product_variants_ids:
-            grouper_attributes = [
-                (a.group.id, [b.category.code for b in a.attributes.all()])
-                for a in Product.objects.filter(
-                    id__in=saved_product_variants_ids,
-                    attributes__gt=1,
-                    group__isnull=False,
-                )
-                .distinct("group")
-                .order_by("group")
+        logger.info(f"Inserting units from product variants => {len(units)}")
+        self.ordercast_api.upsert_units(
+            request=[
+                UpsertUnitsRequest(code=unit["code"], name=I18Name(names=unit["names"]))
+                for unit in units
             ]
-            if grouper_attributes:
-                for grouper in grouper_attributes:
-                    if len(grouper) > 1:
-                        ProductGroup.objects.filter(id=grouper[0]).update(
-                            grouper=grouper[1]
-                        )
+        )
+        logger.info("Inserted / updated units from product variants")
 
-        logger.info(f"Deleting unused objects.")
-
-        def hard_delete_category_external(obj_id):
-            CategoryExternal.all_objects.filter(category_id=obj_id).delete()
-
-        def delete_attributes(actual_attributes):
-            attributes_for_delete = Attribute.objects.exclude(
-                id__in=actual_attributes
-            ).filter(productattribute__isnull=True)
-            AttributeExternal.all_objects.filter(
-                attribute_id__in=attributes_for_delete.values_list("pk", flat=True)
-            ).delete()
-            attributes_for_delete.delete()
-
-        category_ids = self.get_existing_ids(
-            categories,
-            CategoryExternal.objects.filter(category_type=Category.CLASS_TYPE),
-            "category_id",
-        )
-        catalogs_ids = self.get_existing_ids(
-            categories,
-            CategoryExternal.objects.filter(category_type=Category.CATALOG_TYPE),
-            "category_id",
-        )
-        group_ids = self.get_existing_ids(
-            products, ProductGroupExternal.objects.all(), "product_group_id"
-        )
-        product_ids = self.get_existing_ids(
-            product_variants, ProductExternal.objects.all(), "product_id"
-        )
-        attribute_ids = self.get_existing_ids(
-            attributes,
-            CategoryExternal.objects.filter(
-                category_type=Category.PRODUCT_ATTRIBUTE_TYPE
-            ),
-            "category_id",
-        )
-        attribute_value_ids = self.get_existing_ids(
-            attributes["attribute_values"],
-            AttributeExternal.objects.all(),
-            "attribute_id",
+        logger.info(f"Inserting product variants => {len(product_variants)}")
+        self.ordercast_api.upsert_product_variants(
+            request=[
+                UpsertProductVariantsRequest() for product_variant in product_variants
+            ]
         )
 
-        parse_products.delete_products(
-            group_ids, product_ids
-        )  # todo: move this logic to common manager
-        parse_products.delete_categories_by_ids(
-            Category.CLASS_TYPE, category_ids, hard_delete_category_external, False
-        )
-        parse_products.delete_categories_by_ids(
-            Category.CATALOG_TYPE, catalogs_ids, hard_delete_category_external, False
-        )
-        parse_products.delete_categories_by_ids(
-            Category.PRODUCT_ATTRIBUTE_TYPE,
-            attribute_ids,
-            hard_delete_category_external,
-            False,
-        )
-        delete_attributes(attribute_value_ids)
-
-    def save_delivery_option(
-        self, delivery_options_dict: dict[str, Any], odoo_repo: OdooRepo
-    ):
-        delivery_options = delivery_options_dict["objects"]
-        if not delivery_options:
-            logger.info(f"Deleting delivery options.")
-            delivery_option_ids = odoo_repo.get_list(key=RedisKeys.DELIVERY_OPTIONS)
-
-            # TODO: HANDLE
-            if delivery_option_ids:
-                pass
-            #     delivery_option_for_delete = DeliveryOption.objects.exclude(id__in=delivery_option_ids)
-            #     DeliveryOptionExternal.all_objects.filter(
-            #         delivery_option_id__in=delivery_option_for_delete.values_list('pk', flat=True)).delete()
-            #     delivery_option_for_delete.delete()
-            return
-
-        validate_delivery_options(delivery_options)
+    def save_delivery_options(self, delivery_options_dict: dict[str, Any]):
+        self.ordercast_api.upsert
 
         for delivery_option in delivery_options:
             if "name" in delivery_option and delivery_option["name"]:
@@ -628,8 +307,6 @@ class OrdercastManager:
                                 odoo_id=delivery_option["id"], delivery_option=saved.id
                             ),
                         )
-                delivery_option["saved_id"] = saved.id
-                delivery_option["saved"] = saved
 
     def save_warehouse(self, warehouses_dict, odoo_repo: OdooRepo):
         warehouses = warehouses_dict["objects"]

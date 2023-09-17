@@ -1,12 +1,20 @@
-from typing import Optional
+from typing import Optional, Any
 
-from pydantic import BaseModel, PositiveInt
+from pydantic import BaseModel, PositiveInt, model_serializer
 
 
 class ImageObject(BaseModel):
     filename: str
     key: str
     url: str
+
+
+class I18Name(BaseModel):
+    names: dict[str, str]
+
+    @model_serializer
+    def ser_model(self) -> dict[str, str]:
+        return {k: v for k, v in self.names.items()}
 
 
 class Merchant(BaseModel):
@@ -113,3 +121,31 @@ class UpsertAttributesRequest(BaseModel):
     input_type: int = 1
     is_filter: bool = True
     is_quick_search: bool = True
+
+
+class UpsertUnitsRequest(BaseModel):
+    code: str
+    name: I18Name
+
+
+class UpsertProductVariantsRequest(BaseModel):
+    name: I18Name
+    barcode: dict[str, str]
+    product_id: PositiveInt
+    sku: str
+    price_rates: list[dict[str, int]]
+    unit_code: str
+    attribute_values: list[dict[str, Any]]
+    place_in_warehouse: str
+    customs_code: str
+    letter: str
+    status: int = 2
+    description: str = ""
+    packaging: int = 1
+    bundle_min_quantity: int = 0
+    bundle_max_quantity: int = 0
+    in_stock: int = 0
+    is_bundle: bool = False
+    is_editable_quantity: bool = True
+    is_visible_price_net: bool = True
+    image: Optional[ImageObject] = {}

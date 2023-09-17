@@ -126,10 +126,14 @@ def check_remote_id(dto):
         raise SyntaxError(msg)
 
 
-def get_entity_translated_names(entities: list[dict[str, Any]]) -> dict[int, Any]:
+def get_entity_name_as_i18n(
+    entities: list[dict[str, Any]], prefix: str = "name_"
+) -> dict[int, Any]:
     """
     Transforms entities with translated names into a dictionary mapping entity IDs to language-specific names.
 
+    :param prefix: The prefix used in the entity keys to identify language-specific names.
+                   Default is "name_".
     :param entities: List of dictionaries with keys like "name_language" (e.g., "name_de" for German).
                      Values are the translated names in respective languages.
                      Example: {"name_de": "German Name", "name_fr": "French Name"}
@@ -141,8 +145,8 @@ def get_entity_translated_names(entities: list[dict[str, Any]]) -> dict[int, Any
     entities_names = defaultdict(dict)
     for entity in entities:
         for k, v in entity.items():
-            if k.startswith("name_"):
-                _, language = k.split("_")
-                entities_names[entity["id"]][language] = v
+            if k.startswith(prefix):
+                locale = k[len(prefix) :]
+                entities_names[entity["id"]][locale] = v
 
     return entities_names

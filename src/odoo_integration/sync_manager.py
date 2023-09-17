@@ -5,17 +5,32 @@ from typing import Any, Annotated
 import structlog
 from fastapi import Depends
 
-from src.data import OdooUser, OdooProduct, OdooAttribute, OdooCategory, CategoryType
-from .internal.helpers import has_objects, get_i18n_field_as_dict
+from src.data import (
+    OdooUser,
+    OdooProduct,
+    OdooAttribute,
+    OdooCategory,
+    CategoryType,
+    OdooDeliveryOption,
+    OdooProductVariant,
+)
+from .internal.builders import (
+    get_partner_data,
+    get_attribute_data,
+    get_product_data,
+    get_product_variant_data,
+)
+from .internal.helpers import has_objects
 from .internal.odoo_manager import OdooManager, get_odoo_provider
 from .internal.odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
 from .internal.ordercast_manager import OrdercastManager, get_ordercast_manager
-from .internal.partner import validate_partners, create_partner_data
+from .internal.partner import validate_partners
 from .internal.validators import (
     validate_products,
     validate_categories,
     validate_product_variants,
     validate_attributes,
+    validate_delivery_options,
 )
 
 logger = structlog.getLogger(__name__)
@@ -67,7 +82,7 @@ class SyncManager:
         logger.info(f"Received partners => {len(partners)}, started saving them.")
 
         users_to_sync = [
-            create_partner_data(partner) for partner in partners if partner["email"]
+            get_partner_data(partner) for partner in partners if partner["email"]
         ]
 
         self.ordercast_manager.upsert_users(users_to_sync=users_to_sync)
@@ -134,12 +149,7 @@ class SyncManager:
         if attributes:
             validate_attributes(attributes)
             attributes_to_sync = [
-                {
-                    "id": value["id"],
-                    "name": value["name"],
-                    **({"position": value["position"]} if "position" in value else {}),
-                    **get_i18n_field_as_dict(value, "name"),
-                }
+                get_attribute_data(value)
                 for attribute in attributes["objects"]
                 for value in attribute.get("values", [])
                 if all(key in value for key in ("id", "name"))
@@ -177,21 +187,14 @@ class SyncManager:
             validate_products(products)
 
             products_to_sync = [
-                {
-                    "name": product["name"],
-                    "is_removed": False,
-                    "i18n_fields": get_i18n_field_as_dict(product, "name"),
-                    "names": product["names"],
-                    "category": product["categ_id"][0],
-                }
-                for product in products["objects"]
+                get_product_data(product) for product in products["objects"]
             ]
 
             self.ordercast_manager.save_products(products_to_sync)
             self.repo.insert_many(
                 key=RedisKeys.PRODUCTS,
                 entities=[
-                    OdooProduct(odoo_id=product["erp_id"], name=product["name"])
+                    OdooProduct(odoo_id=product["id"], name=product["name"])
                     for product in products_to_sync
                 ],
             )
@@ -219,10 +222,25 @@ class SyncManager:
         if has_product_variants:
             validate_product_variants(product_variants["objects"])
             logger.info(
-                f"Starting saving products after saving categories and attributes."
+                f"Starting saving product variants after saving categories and attributes."
             )
+            units = self.odoo_manager.get_units()
+            product_variants_to_sync = [
+                get_product_variant_data(product_variant)
+                for product_variant in product_variants["objects"]
+            ]
+
             self.ordercast_manager.save_product_variants(
-                categories, products, attributes, product_variants
+                product_variants=product_variants_to_sync, units=units
+            )
+            self.repo.insert_many(
+                key=RedisKeys.PRODUCT_VARIANTS,
+                entities=[
+                    OdooProductVariant(
+                        odoo_id=product_variant["id"], name=product_variant["name"]
+                    )
+                    for product_variant in product_variants_to_sync
+                ],
             )
 
     def sync_warehouses(self):
@@ -231,9 +249,30 @@ class SyncManager:
             f"Received {len(delivery_options['objects']) if delivery_options and 'objects' in delivery_options else 0} delivery options, start saving them."
         )
         if delivery_options:
-            self.ordercast_manager.save_delivery_option(
-                delivery_options, odoo_repo=self.repo
+            validate_delivery_options(delivery_options)
+
+            delivery_options_to_sync = []
+
+            self.ordercast_manager.save_delivery_options(delivery_options_to_sync)
+            self.repo.insert_many(
+                key=RedisKeys.DELIVERY_OPTIONS,
+                entities=[
+                    OdooDeliveryOption(
+                        odoo_id=delivery_option["id"], name=delivery_option["name"]
+                    )
+                    for delivery_option in delivery_options_to_sync
+                ],
             )
+        else:
+            existing_odoo_delivery_options = self.repo.get_list(
+                key=RedisKeys.DELIVERY_OPTIONS
+            )
+            existing_ordercast_delivery_options = set()
+            to_delete = (
+                existing_ordercast_delivery_options - existing_odoo_delivery_options
+            )
+            self.ordercast_manager.delete_delivery_options(to_delete)
+            self.repo.remove(to_delete)
 
         warehouses = self.odoo_manager.receive_warehouses()
         logger.info(

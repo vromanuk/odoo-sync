@@ -25,6 +25,8 @@ from .ordercast_api_requests import (
     UpsertProductsRequest,
     UpsertCategoriesRequest,
     UpsertAttributesRequest,
+    UpsertProductVariantsRequest,
+    UpsertUnitsRequest,
 )
 
 logger = structlog.getLogger(__name__)
@@ -127,10 +129,10 @@ class OrdercastApi:
         )
 
     @error_handler
-    def upsert_units(self, units: list) -> Response:
+    def upsert_units(self, request: list[UpsertUnitsRequest]) -> Response:
         return httpx.post(
             url=f"{self.base_url}/product/unit/",
-            data=units,
+            json=[model.model_dump() for model in request],
             headers=self._auth_headers,
         )
 
@@ -138,6 +140,16 @@ class OrdercastApi:
     def upsert_products(self, request: list[UpsertProductsRequest]) -> Response:
         return httpx.post(
             url=f"{self.base_url}/product/",
+            json=[model.model_dump() for model in request],
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def upsert_product_variants(
+        self, request: list[UpsertProductVariantsRequest]
+    ) -> Response:
+        return httpx.post(
+            url=f"{self.base_url}/product/variant/",
             json=[model.model_dump() for model in request],
             headers=self._auth_headers,
         )

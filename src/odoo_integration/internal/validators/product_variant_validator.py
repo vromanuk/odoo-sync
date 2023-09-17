@@ -15,7 +15,7 @@ from ..helpers import (
 logger = structlog.getLogger(__name__)
 
 
-def validate_product_variants(product_variants: dict[str, Any]) -> None:
+def validate_product_variants(product_variants: list[dict[str, Any]]) -> None:
     product_variants = sorted(product_variants, key=lambda d: d["display_name"])
 
     if not product_variants:

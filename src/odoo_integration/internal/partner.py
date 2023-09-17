@@ -1,9 +1,8 @@
-import secrets
 from typing import Any
 
 import structlog
 
-from src.data import UserStatus, OrdercastMerchant
+from src.data import OrdercastMerchant
 from src.infrastructure import OdooClient
 from .exceptions import OdooSyncException
 from .helpers import is_not_empty, is_empty, is_unique_by, is_length_not_in_range
@@ -105,39 +104,3 @@ def validate_partners(
         raise OdooSyncException(
             "User has errors. Please correct them in Odoo and try to sync again."
         )
-
-
-def create_partner_data(partner: dict[str, Any]) -> dict[str, Any]:
-    language = (
-        partner.get("language", "fr")
-        if partner.get("language") and len(partner.get("language")) == 2
-        else "fr"
-    )
-    website = (
-        partner["website"]
-        if not is_empty(partner, "website")
-        else "https://shop.company.domain"
-    )
-    info = partner["comment"] if not is_empty(partner, "comment") else ""
-
-    user_data = {
-        "name": partner["name"],
-        "erp_id": partner["id"],
-        "is_approved": False,
-        "is_active": True,
-        "is_removed": False,
-        "password": secrets.token_urlsafe(nbytes=64),
-        "status": UserStatus.NEW,
-        "language": language,
-        "website": website,
-        "info": info,
-        "phone": partner.get("phone", "+3281000000"),
-        "city": partner.get("city", "Southampton"),
-        "postcode": partner.get("postcode", "21701"),
-        "street": partner.get("street", "81 Bedford Pl"),
-        "vat": partner.get("vat", "BE09999999XX"),
-        "email": partner["email"],
-        "odoo_data": partner,
-    }
-
-    return user_data
