@@ -5,7 +5,7 @@ from typing import Any, Annotated
 import structlog
 from fastapi import Depends
 
-from src.data import OdooUser, OdooProduct, OdooAttribute
+from src.data import OdooUser, OdooProduct, OdooAttribute, OdooCategory, CategoryType
 from .helpers import has_objects, get_i18n_field_as_dict
 from .odoo_manager import OdooManager, get_odoo_provider
 from .odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
@@ -109,6 +109,18 @@ class SyncManager:
         if categories:
             validate_categories(categories)
             self.ordercast_manager.save_categories(categories["objects"])
+            self.repo.insert_many(
+                key=RedisKeys.CATEGORIES,
+                entities=[
+                    OdooCategory(
+                        odoo_id=category["id"],
+                        name=category["name"],
+                        category_type=CategoryType.CLASS,
+                        sync_date=datetime.now(timezone.utc),
+                    )
+                    for category in categories["objects"]
+                ],
+            )
 
         return categories
 

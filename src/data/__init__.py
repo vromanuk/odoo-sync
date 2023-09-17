@@ -17,10 +17,11 @@ from .models import (
     OdooWarehouse,
     OdooOrder,
     OdooBasketProduct,
+    OdooCategory,
+    CategoryType,
 )
-from .typings import OdooEntity
-
 from .ordercast_models import OrdercastMerchant
+from .typings import OdooEntity
 
 __all__ = (
     "OdooUser",
@@ -41,4 +42,6 @@ __all__ = (
     "InvoiceStatus",
     "Locale",
     "OrdercastMerchant",
+    "OdooCategory",
+    "CategoryType",
 )

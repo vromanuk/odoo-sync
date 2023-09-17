@@ -15,6 +15,7 @@ from src.data import (
     OdooWarehouse,
     OdooOrder,
     OdooBasketProduct,
+    OdooCategory,
 )
 from src.infrastructure import RedisClient, get_redis_client
 
@@ -24,6 +25,7 @@ class RedisKeys(str, enum.Enum):
     ADDRESSES = "addresses"
     PRODUCTS = "products"
     ATTRIBUTES = "attributes"
+    CATEGORIES = "categories"
     PRODUCT_VARIANTS = "product_variants"
     DELIVERY_OPTIONS = "delivery_options"
     WAREHOUSES = "warehouses"
@@ -55,6 +57,10 @@ class OdooRepo:
             RedisKeys.ATTRIBUTES: {
                 "key": f"{self._prefix}:odoo:attributes",
                 "model": OdooAttribute,
+            },
+            RedisKeys.CATEGORIES: {
+                "key": f"{self._prefix}:odoo:categories",
+                "model": OdooCategory,
             },
             RedisKeys.PRODUCT_VARIANTS: {
                 "key": f"{self._prefix}:odoo:product_variants",
