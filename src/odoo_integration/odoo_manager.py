@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Annotated, Optional, Any
 
@@ -589,6 +590,13 @@ class OdooManager:
             if not parent["parent_id"]
         }
 
+        category_names = defaultdict(dict)
+        for category in categories:
+            for k, v in category.items():
+                if k.startswith("name_"):
+                    _, language = k.split("_")
+                    category_names[category["id"]][language] = v
+
         result = [
             {
                 "id": category["id"],
@@ -607,6 +615,7 @@ class OdooManager:
                 "parent_code": parent_codes[category["parent_id"][0]]
                 if category["parent_id"]
                 else "root",
+                "names": category_names[category["id"]],
             }
             for category in categories
         ]

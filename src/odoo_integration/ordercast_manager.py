@@ -192,7 +192,7 @@ class OrdercastManager:
         self.ordercast_api.upsert_categories(
             request=[
                 UpsertCategoriesRequest(
-                    name=category["name"],
+                    name=category["names"],
                     parent_id=category["parent"],
                     parent_code=category["parent_code"],
                     index=category.get("index", 1),

@@ -90,7 +90,7 @@ class CreateBillingAddressRequest(BaseModel):
 
 
 class UpsertProductsRequest(BaseModel):
-    image: Optional[ImageObject] = None
+    image: Optional[ImageObject] = {}
     name: str
     sku: str
     catalogs: list[PositiveInt]
@@ -98,11 +98,11 @@ class UpsertProductsRequest(BaseModel):
 
 
 class UpsertCategoriesRequest(BaseModel):
-    name: str
+    name: dict[str, str]
     parent_id: Optional[PositiveInt]
     parent_code: str
     index: PositiveInt
-    image: Optional[ImageObject] = None
+    image: Optional[ImageObject] = {}
     code: str = ""
 
 
