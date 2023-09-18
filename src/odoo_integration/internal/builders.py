@@ -1,7 +1,7 @@
 import secrets
 from typing import Any
 
-from src.data import UserStatus, OrdercastProduct
+from src.data import UserStatus, OrdercastProduct, OrdercastAttribute
 from .helpers import is_empty, get_i18n_field_as_dict
 
 
@@ -65,13 +65,22 @@ def get_product_variant_data(
     product_variant: dict[str, Any],
     odoo_products: list[dict[str, Any]],
     ordercast_products: list[OrdercastProduct],
+    odoo_attributes: list[dict, str, Any],
+    ordercast_attributes: list[OrdercastAttribute],
 ) -> dict[str, Any]:
-    ordercast_sku_to_id_mapper = {p.sku: p.id for p in ordercast_products}
+    ordercast_product_mapper = {p.sku: p.id for p in ordercast_products}
     product_mapper = {
-        p["id"]: ordercast_sku_to_id_mapper[p["name"]]
+        p["id"]: ordercast_product_mapper[p["name"]]
         for p in odoo_products
-        if p["name"] in ordercast_sku_to_id_mapper
+        if p["name"] in ordercast_product_mapper
     }
+    ordercast_attribute_mapper = {a.name: a.id for a in ordercast_attributes}
+    attribute_mapper = {
+        a["id"]: ordercast_attribute_mapper[a["name"]]
+        for a in odoo_attributes
+        if a["name"] in ordercast_attribute_mapper
+    }
+
     remote_id = product_variant["id"]
 
     i18n_fields = get_i18n_field_as_dict(
@@ -92,6 +101,9 @@ def get_product_variant_data(
         "is_removed": False,
         "names": product_variant["names"],
         "sku": product_variant["code"],
+        "attribute_values": [
+            attribute_mapper.get(a) for a in product_variant.get("attribute_values", [])
+        ],
     }
     defaults.update(i18n_fields)
 

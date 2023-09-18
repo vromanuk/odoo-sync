@@ -13,6 +13,7 @@ from src.data import (
     Locale,
     OrdercastMerchant,
     OrdercastProduct,
+    OrdercastAttribute,
 )
 from src.infrastructure import (
     OrdercastApi,
@@ -157,11 +158,24 @@ class OrdercastManager:
         logger.info("Receiving products from Ordercast")
         # TODO: handle pagination
         response = self.ordercast_api.get_products(request=ListProductsRequest())
-        products = response.json()["items"]
-        return [
-            OrdercastProduct(id=product["id"], sku=product["sku"])
-            for product in products
-        ]
+        result_json = response.json()
+        if result_json:
+            return [
+                OrdercastProduct(id=product["id"], sku=product["sku"])
+                for product in result_json["items"]
+            ]
+        return []
+
+    def get_attributes(self) -> list[OrdercastAttribute]:
+        logger.info("Receiving attributes from Ordercast")
+        response = self.ordercast_api.get_attributes()
+        result_json = response.json()
+        if result_json:
+            return [
+                OrdercastAttribute(id=attribute["id"], name=attribute["name"])
+                for attribute in result_json["items"]
+            ]
+        return []
 
     def get_address(self, address, odoo_repo: OdooRepo):
         if address:
@@ -247,7 +261,24 @@ class OrdercastManager:
         logger.info(f"Inserting product variants => {len(product_variants)}")
         self.ordercast_api.upsert_product_variants(
             request=[
-                UpsertProductVariantsRequest() for product_variant in product_variants
+                UpsertProductVariantsRequest(
+                    name=product_variant["names"],
+                    barcode=product_variant.get(
+                        "barcode", product_variant.get("ref", "")
+                    ),
+                    product_id=product_variant["product_id"],
+                    sku=product_variant["sku"],
+                    price_rates=[],
+                    unit_code=product_variant["unit_code"],
+                    attribute_values=[
+                        {"value_id": a.id} for a in product_variant["attribute_values"]
+                    ],
+                    place_in_warehouse="",
+                    customs_code="",
+                    letter="",
+                    description=product_variant.get("description", ""),
+                )
+                for product_variant in product_variants
             ]
         )
 

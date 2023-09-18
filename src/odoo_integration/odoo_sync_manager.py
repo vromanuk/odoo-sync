@@ -107,10 +107,12 @@ class OdooSyncManager:
 
     def sync_products(self, full_sync: bool = False) -> None:
         self.sync_categories_to_ordercast()
-        self.sync_attributes_to_ordercast()
+        attributes = self.sync_attributes_to_ordercast()
         products = self.sync_products_to_ordercast(full_sync=full_sync)
         self.sync_product_variants_to_ordercast(
-            full_sync=full_sync, products=products["objects"]
+            full_sync=full_sync,
+            products=products["objects"],
+            attributes=attributes["objects"],
         )
 
     def sync_categories_to_ordercast(self) -> dict[str, Any]:
@@ -187,7 +189,7 @@ class OdooSyncManager:
                 get_product_data(product) for product in products["objects"]
             ]
 
-            self.ordercast_manager.save_products(products_to_sync)
+            # self.ordercast_manager.save_products(products_to_sync)
             self.repo.insert_many(
                 key=RedisKeys.PRODUCTS,
                 entities=[
@@ -200,6 +202,7 @@ class OdooSyncManager:
     def sync_product_variants_to_ordercast(
         self,
         products: list[dict[str, Any]],
+        attributes: list[dict[str, Any]],
         full_sync: bool = False,
     ) -> None:
         last_sync_date = (
@@ -220,11 +223,15 @@ class OdooSyncManager:
                 f"Starting saving product variants after saving categories and attributes."
             )
             units = self.odoo_manager.get_units()
+            ordercast_products = self.ordercast_manager.get_products()
+            ordercast_attributes = self.ordercast_manager.get_attributes()
             product_variants_to_sync = [
                 get_product_variant_data(
                     product_variant=product_variant,
                     odoo_products=products,
-                    ordercast_products=self.ordercast_manager.get_products(),
+                    ordercast_products=ordercast_products,
+                    odoo_attributes=attributes,
+                    ordercast_attributes=ordercast_attributes,
                 )
                 for product_variant in product_variants["objects"]
             ]

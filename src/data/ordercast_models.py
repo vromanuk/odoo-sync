@@ -12,3 +12,8 @@ class OrdercastMerchant(BaseModel):
 class OrdercastProduct(BaseModel):
     id: PositiveInt
     sku: str
+
+
+class OrdercastAttribute(BaseModel):
+    id: PositiveInt
+    name: str
