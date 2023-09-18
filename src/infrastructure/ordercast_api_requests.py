@@ -115,8 +115,8 @@ class UpsertProductsRequest(BaseModel):
 
 class UpsertCategoriesRequest(BaseModel):
     name: dict[str, str]
-    parent_id: Optional[PositiveInt]
-    parent_code: str
+    parent_id: Optional[PositiveInt] = None
+    parent_code: Optional[str]
     index: PositiveInt
     image: Optional[ImageObject] = {}
     code: str = ""

@@ -214,7 +214,6 @@ class OrdercastManager:
             request=[
                 UpsertCategoriesRequest(
                     name=category["names"],
-                    parent_id=category["parent"],
                     parent_code=category["parent_code"],
                     index=category.get("index", 1),
                     code=category.get("code", ""),
