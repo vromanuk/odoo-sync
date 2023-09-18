@@ -36,7 +36,7 @@ from .internal.validators import (
 logger = structlog.getLogger(__name__)
 
 
-class SyncManager:
+class OdooSyncManager:
     def __init__(
         self,
         repo: OdooRepo,
@@ -301,5 +301,5 @@ def get_odoo_sync_manager(
     odoo_repo: Annotated[OdooRepo, Depends(get_odoo_repo)],
     odoo_provider: Annotated[OdooManager, Depends(get_odoo_provider)],
     ordercast_manager: Annotated[OrdercastManager, Depends(get_ordercast_manager)],
-) -> SyncManager:
-    return SyncManager(odoo_repo, odoo_provider, ordercast_manager)
+) -> OdooSyncManager:
+    return OdooSyncManager(odoo_repo, odoo_provider, ordercast_manager)

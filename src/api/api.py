@@ -4,7 +4,7 @@ import structlog
 from fastapi import APIRouter, Depends
 
 from src.infrastructure import RedisClient, get_redis_client
-from src.odoo_integration import SyncManager, get_odoo_sync_manager
+from src.odoo_integration import OdooSyncManager, get_odoo_sync_manager
 from .base_response import Response
 
 logger = structlog.getLogger(__name__)
@@ -35,7 +35,7 @@ async def health(
     response_model=Response,
 )
 async def sync(
-    odoo_sync_manager: Annotated[SyncManager, Depends(get_odoo_sync_manager)]
+    odoo_sync_manager: Annotated[OdooSyncManager, Depends(get_odoo_sync_manager)]
 ) -> Response:
     odoo_sync_manager.sync()
     return Response(message="Started full sync")
