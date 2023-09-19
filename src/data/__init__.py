@@ -19,6 +19,7 @@ from .models import (
     OdooBasketProduct,
     OdooCategory,
     CategoryType,
+    OdooPriceRate,
 )
 from .ordercast_models import (
     OrdercastMerchant,
@@ -52,4 +53,5 @@ __all__ = (
     "CategoryType",
     "OrdercastAttribute",
     "OrdercastCategory",
+    "OdooPriceRate",
 )

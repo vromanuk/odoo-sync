@@ -13,6 +13,7 @@ from src.data import (
     CategoryType,
     OdooDeliveryOption,
     OdooProductVariant,
+    OdooPriceRate,
 )
 from .internal.builders import (
     get_partner_data,
@@ -233,6 +234,17 @@ class OdooSyncManager:
             logger.info(
                 f"Starting saving product variants after saving categories and attributes."
             )
+            default_price_rate = self.repo.get_key(RedisKeys.DEFAULT_PRICE_RATE)
+
+            if not default_price_rate:
+                default_price_rate = self.ordercast_manager.get_default_price_rate()
+                self.repo.set(
+                    key=RedisKeys.DEFAULT_PRICE_RATE,
+                    entity=OdooPriceRate(
+                        id=default_price_rate["id"], name=default_price_rate["name"]
+                    ),
+                )
+
             units = self.odoo_manager.get_units()
             ordercast_products = self.ordercast_manager.get_products()
             ordercast_attributes = self.ordercast_manager.get_attributes()
@@ -248,7 +260,9 @@ class OdooSyncManager:
             ]
 
             self.ordercast_manager.save_product_variants(
-                product_variants=product_variants_to_sync, units=units
+                product_variants=product_variants_to_sync,
+                units=units,
+                default_price_rate=default_price_rate,
             )
             self.repo.insert_many(
                 key=RedisKeys.PRODUCT_VARIANTS,

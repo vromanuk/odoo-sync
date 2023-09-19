@@ -17,6 +17,12 @@ class I18Name(BaseModel):
         return {k: v for k, v in self.names.items()}
 
 
+class PriceRate(BaseModel):
+    price: int
+    price_rate_id: PositiveInt
+    quantity: PositiveInt
+
+
 class Merchant(BaseModel):
     erp_id: PositiveInt
     name: str
@@ -156,4 +162,9 @@ class UpsertProductVariantsRequest(BaseModel):
     is_bundle: bool = False
     is_editable_quantity: bool = True
     is_visible_price_net: bool = True
-    image: Optional[ImageObject] = {}
+    images: Optional[list[ImageObject]] = []
+
+
+class UpsertPriceRatesRequest(BaseModel):
+    name: str
+    show_recommended: bool = False

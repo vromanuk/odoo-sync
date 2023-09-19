@@ -35,6 +35,8 @@ from src.infrastructure import (
     UpsertUnitsRequest,
     I18Name,
     ListProductsRequest,
+    UpsertPriceRatesRequest,
+    PriceRate,
 )
 from .helpers import (
     get_i18n_field_as_dict,
@@ -187,6 +189,26 @@ class OrdercastManager:
             for category in result_json
         ]
 
+    def get_default_price_rate(self) -> dict[str, Any]:
+        logger.info("Creating a Default Odoo price rate")
+        default_odoo_price_rate = "Default Odoo Price Rate"
+        self.ordercast_api.upsert_price_rate(
+            request=UpsertPriceRatesRequest(name=default_odoo_price_rate)
+        )
+        logger.info("Created a Default Odoo price rate")
+
+        logger.info("Receiving `id` of Default Odoo price rate")
+        response = self.ordercast_api.get_price_rates()
+        result_json = response.json()
+        return next(
+            (
+                price_rate
+                for price_rate in result_json
+                if price_rate.get("name") == default_odoo_price_rate
+            ),
+            None,
+        )
+
     def get_address(self, address, odoo_repo: OdooRepo):
         if address:
             address_dto = {
@@ -257,8 +279,12 @@ class OrdercastManager:
         )
 
     def save_product_variants(
-        self, product_variants: list[dict[str, Any]], units: list[dict[str, Any]]
+        self,
+        product_variants: list[dict[str, Any]],
+        units: list[dict[str, Any]],
+        default_price_rate: dict[str, Any],
     ) -> None:
+        # TODO fetch from cache if exists
         logger.info(f"Inserting units from product variants => {len(units)}")
         self.ordercast_api.upsert_units(
             request=[
@@ -278,10 +304,18 @@ class OrdercastManager:
                     ),
                     product_id=product_variant["product_id"],
                     sku=product_variant["sku"],
-                    price_rates=[],
+                    price_rates=[
+                        PriceRate(
+                            price=product_variant["price"],
+                            price_rate_id=default_price_rate["id"],
+                            quantity=1,
+                        )
+                    ],
                     unit_code=product_variant["unit_code"],
                     attribute_values=[
-                        {"value_id": a.id} for a in product_variant["attribute_values"]
+                        {"value_id": a.id}
+                        for a in product_variant["attribute_values"]
+                        if a
                     ],
                     place_in_warehouse="",
                     customs_code="",

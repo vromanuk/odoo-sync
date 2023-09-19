@@ -11,6 +11,7 @@ from .models import (
     OdooDeliveryOption,
     OdooAddress,
     OdooBasketProduct,
+    OdooPriceRate,
 )
 
 OdooEntity = Union[
@@ -24,4 +25,5 @@ OdooEntity = Union[
     | OdooWarehouse
     | OdooAddress
     | OdooBasketProduct
+    | OdooPriceRate
 ]

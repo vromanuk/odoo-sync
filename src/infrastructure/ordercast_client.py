@@ -28,6 +28,7 @@ from .ordercast_api_requests import (
     UpsertProductVariantsRequest,
     UpsertUnitsRequest,
     ListProductsRequest,
+    UpsertPriceRatesRequest,
 )
 
 logger = structlog.getLogger(__name__)
@@ -226,6 +227,21 @@ class OrdercastApi:
     def get_categories(self) -> Response:
         return httpx.get(
             url=f"{self.base_url}/category/",
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def upsert_price_rate(self, request: UpsertPriceRatesRequest) -> Response:
+        return httpx.post(
+            url=f"{self.base_url}/price-rate",
+            data=request.model_dump(),
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def get_price_rates(self) -> Response:
+        return httpx.get(
+            url=f"{self.base_url}/price-rate/",
             headers=self._auth_headers,
         )
 

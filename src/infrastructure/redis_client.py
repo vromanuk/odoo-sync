@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 import redis
 from fastapi import Depends
@@ -16,6 +16,9 @@ class RedisClient:
 
     def get(self, key: str):
         return self._client.get(key)
+
+    def set(self, key: str, entity: str) -> None:
+        self._client.set(name=key, value=entity)
 
     def get_many(self, key: str) -> list:
         entity_ids = self._client.sscan_iter(key)

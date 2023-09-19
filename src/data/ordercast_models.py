@@ -3,23 +3,22 @@ from typing import Optional
 from pydantic import BaseModel, PositiveInt
 
 
-class OrdercastMerchant(BaseModel):
+class OrdercastCommon(BaseModel):
     id: PositiveInt
     name: str
+
+
+class OrdercastMerchant(OrdercastCommon):
     erp_id: Optional[str]
 
 
-class OrdercastProduct(BaseModel):
-    id: PositiveInt
+class OrdercastProduct(OrdercastCommon):
     sku: str
 
 
-class OrdercastAttribute(BaseModel):
-    id: PositiveInt
-    name: str
+class OrdercastAttribute(OrdercastCommon):
+    pass
 
 
-class OrdercastCategory(BaseModel):
-    id: PositiveInt
-    name: str
+class OrdercastCategory(OrdercastCommon):
     code: str

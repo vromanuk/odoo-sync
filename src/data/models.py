@@ -70,3 +70,8 @@ class OdooAddress(OdooCommons):
 
 class OdooBasketProduct(OdooCommons):
     basket_product: PositiveInt
+
+
+class OdooPriceRate(BaseModel):
+    id: PositiveInt
+    name: str
