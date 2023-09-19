@@ -14,6 +14,7 @@ from src.data import (
     OrdercastMerchant,
     OrdercastProduct,
     OrdercastAttribute,
+    OrdercastCategory,
 )
 from src.infrastructure import (
     OrdercastApi,
@@ -170,12 +171,21 @@ class OrdercastManager:
         logger.info("Receiving attributes from Ordercast")
         response = self.ordercast_api.get_attributes()
         result_json = response.json()
-        if result_json:
-            return [
-                OrdercastAttribute(id=attribute["id"], name=attribute["name"])
-                for attribute in result_json["items"]
-            ]
-        return []
+        return [
+            OrdercastAttribute(id=attribute["id"], name=attribute["name"])
+            for attribute in result_json
+        ]
+
+    def get_categories(self) -> list[OrdercastCategory]:
+        logger.info("Receiving categories from Ordercast")
+        response = self.ordercast_api.get_categories()
+        result_json = response.json()
+        return [
+            OrdercastCategory(
+                id=category["id"], name=category["name"], code=category["code"]
+            )
+            for category in result_json
+        ]
 
     def get_address(self, address, odoo_repo: OdooRepo):
         if address:

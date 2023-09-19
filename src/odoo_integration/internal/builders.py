@@ -1,7 +1,7 @@
 import secrets
 from typing import Any
 
-from src.data import UserStatus, OrdercastProduct, OrdercastAttribute
+from src.data import UserStatus, OrdercastProduct, OrdercastAttribute, OrdercastCategory
 from .helpers import is_empty, get_i18n_field_as_dict
 
 
@@ -50,13 +50,24 @@ def get_attribute_data(attribute: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def get_product_data(product: dict[str, Any]) -> dict[str, Any]:
+def get_product_data(
+    product: dict[str, Any],
+    odoo_categories: list[dict[str, Any]],
+    ordercast_categories: list[OrdercastCategory],
+) -> dict[str, Any]:
+    ordercast_category_mapper = {c.code: c.id for c in ordercast_categories}
+    category_mapper = {
+        c["id"]: ordercast_category_mapper[c["name"]]
+        for c in odoo_categories
+        if c["name"] in ordercast_categories
+    }
+
     return {
         "name": product["name"],
         "is_removed": False,
         "i18n_fields": get_i18n_field_as_dict(product, "name"),
         "names": product["names"],
-        "category": product["categ_id"][0],
+        "category": category_mapper.get(product["categ_id"][0], product["categ_id"][0]),
         "id": product["id"],
     }
 

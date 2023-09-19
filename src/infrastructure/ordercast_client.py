@@ -222,6 +222,13 @@ class OrdercastApi:
             headers=self._auth_headers,
         )
 
+    @error_handler
+    def get_categories(self) -> Response:
+        return httpx.get(
+            url=f"{self.base_url}/category/",
+            headers=self._auth_headers,
+        )
+
 
 # @lru_cache()
 def get_ordercast_api(

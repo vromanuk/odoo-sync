@@ -106,9 +106,11 @@ class OdooSyncManager:
             self.ordercast_manager.create_shipping_address(partner)
 
     def sync_products(self, full_sync: bool = False) -> None:
-        self.sync_categories_to_ordercast()
+        categories = self.sync_categories_to_ordercast()
         attributes = self.sync_attributes_to_ordercast()
-        products = self.sync_products_to_ordercast(full_sync=full_sync)
+        products = self.sync_products_to_ordercast(
+            categories=categories["objects"], full_sync=full_sync
+        )
         self.sync_product_variants_to_ordercast(
             full_sync=full_sync,
             products=products["objects"],
@@ -171,7 +173,9 @@ class OdooSyncManager:
 
         return attributes
 
-    def sync_products_to_ordercast(self, full_sync: bool = False) -> dict[str, Any]:
+    def sync_products_to_ordercast(
+        self, categories: list[dict[str, Any]], full_sync: bool = False
+    ) -> dict[str, Any]:
         last_sync_date = (
             None if full_sync else self.repo.get_key(RedisKeys.LAST_PRODUCT_SYNC)
         )
@@ -185,11 +189,18 @@ class OdooSyncManager:
         if has_objects(products):
             validate_products(products)
 
+            ordercast_categories = self.ordercast_manager.get_categories()
+
             products_to_sync = [
-                get_product_data(product) for product in products["objects"]
+                get_product_data(
+                    product,
+                    odoo_categories=categories,
+                    ordercast_categories=ordercast_categories,
+                )
+                for product in products["objects"]
             ]
 
-            # self.ordercast_manager.save_products(products_to_sync)
+            self.ordercast_manager.save_products(products_to_sync)
             self.repo.insert_many(
                 key=RedisKeys.PRODUCTS,
                 entities=[

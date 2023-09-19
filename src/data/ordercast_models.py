@@ -17,3 +17,9 @@ class OrdercastProduct(BaseModel):
 class OrdercastAttribute(BaseModel):
     id: PositiveInt
     name: str
+
+
+class OrdercastCategory(BaseModel):
+    id: PositiveInt
+    name: str
+    code: str
