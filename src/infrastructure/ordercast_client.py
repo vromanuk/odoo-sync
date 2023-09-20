@@ -31,6 +31,7 @@ from .ordercast_api_requests import (
     UpsertPriceRatesRequest,
     AddDeliveryMethodRequest,
     CreatePickupLocationRequest,
+    ListOrdersRequest,
 )
 
 logger = structlog.getLogger(__name__)
@@ -159,10 +160,9 @@ class OrdercastApi:
         )
 
     @error_handler
-    def get_orders(self, order_ids, from_date) -> Response:
-        # TODO: introduce parameter passing
+    def get_orders(self, request: ListOrdersRequest) -> Response:
         return httpx.get(
-            url=f"{self.base_url}/order/",
+            url=f"{self.base_url}/order/?pageIndex={request.pageIndex}&pageSize={request.pageSize}&prevId={request.prevId}",
             headers=self._auth_headers,
         )
 

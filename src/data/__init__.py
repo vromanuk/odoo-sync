@@ -26,6 +26,7 @@ from .ordercast_models import (
     OrdercastProduct,
     OrdercastAttribute,
     OrdercastCategory,
+    OrdercastOrder,
 )
 from .typings import OdooEntity
 
@@ -54,4 +55,5 @@ __all__ = (
     "OrdercastAttribute",
     "OrdercastCategory",
     "OdooPriceRate",
+    "OrdercastOrder",
 )

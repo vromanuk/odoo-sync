@@ -764,9 +764,10 @@ class OdooManager:
             "objects": result,
         }
 
-    def sync_orders(self, orders) -> None:
+    def sync_orders(self, orders: list[dict[str, Any]]) -> None:
         if not orders:
             return
+
         remote_orders_obj = self._client["sale.order"]
         remote_orders_line_obj = self._client["sale.order.line"]
         for order_dto in orders:
@@ -931,13 +932,15 @@ class OdooManager:
                             ),
                         )
 
-    def receive_orders(self, from_date=None):
+    def receive_orders(
+        self, from_date: Optional[datetime] = None
+    ) -> list[dict[str, Any]]:
         if not self.repo.get_len(RedisKeys.ORDERS):
             logger.info(
                 "There are no order were send to Odoo, seems no orders created yet.",
                 "INFO",
             )
-            return None
+            return []
 
         orders = self.get_remote_updated_objects("sale.order", OdooOrder, from_date)
 

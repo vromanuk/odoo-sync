@@ -1,5 +1,6 @@
+from datetime import datetime
 from functools import lru_cache
-from typing import Any, Annotated
+from typing import Any, Annotated, Optional
 
 import structlog
 from fastapi import Depends
@@ -273,20 +274,22 @@ class OdooSyncManager:
             self.ordercast_manager.save_pickup_locations(pickup_locations_to_sync)
             self.odoo_manager.save_pickup_locations(pickup_locations_to_sync)
 
-    def sync_orders_with_odoo(self, order_ids=None, from_date=None) -> None:
-        orders = self.ordercast_manager.get_orders(
-            order_ids, from_date=from_date, odoo_repo=self.repo
-        )
+    def sync_orders_with_odoo(
+        self,
+        order_ids: Optional[list[int]] = None,
+        from_date: Optional[datetime] = None,
+    ) -> None:
+        orders = self.ordercast_manager.get_orders(order_ids, from_date=from_date)
         logger.info(f"Loaded {len(orders)} orders, start sending them to Odoo.")
         self.odoo_manager.sync_orders(orders)
 
-    def sync_orders_with_ordercast(self, from_date=None) -> None:
+    def sync_orders_with_ordercast(self, from_date: Optional[datetime] = None) -> None:
         orders = self.odoo_manager.receive_orders(from_date=from_date)
         logger.info(
             f"Received {len(orders) if orders else 0} orders, start saving them."
         )
         if orders:
-            self.ordercast_manager.sync_orders(orders, odoo_repo=self.repo)
+            self.ordercast_manager.sync_orders(orders)
 
 
 @lru_cache()

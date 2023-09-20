@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, PositiveInt
@@ -22,3 +23,9 @@ class OrdercastAttribute(OrdercastCommon):
 
 class OrdercastCategory(OrdercastCommon):
     code: str
+
+
+class OrdercastOrder(OrdercastCommon):
+    id: PositiveInt
+    created_at: datetime
+    updated_at: datetime

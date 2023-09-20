@@ -78,6 +78,10 @@ class ListProductsRequest(BasePaginatedRequest):
     pass
 
 
+class ListOrdersRequest(BasePaginatedRequest):
+    pass
+
+
 class CreateOrderRequest(BaseModel):
     order_status_enum: PositiveInt
     merchant_id: PositiveInt

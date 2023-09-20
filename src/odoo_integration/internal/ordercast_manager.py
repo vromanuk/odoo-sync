@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 import structlog
 from fastapi import Depends
@@ -13,6 +13,7 @@ from src.data import (
     OrdercastProduct,
     OrdercastAttribute,
     OrdercastCategory,
+    OrdercastOrder,
 )
 from src.infrastructure import (
     OrdercastApi,
@@ -343,8 +344,23 @@ class OrdercastManager:
                 )
             )
 
-    def get_orders(self, order_ids, odoo_repo: OdooRepo, from_date=None):
-        orders = self.ordercast_api.get_orders(order_ids, from_date)
+    def get_orders(
+        self,
+        order_ids: Optional[list[int]] = None,
+        from_date: Optional[datetime] = None,
+    ):
+        logger.info("Receiving orders from Ordercast")
+        # TODO handle pagination
+        response = self.ordercast_api.get_orders(order_ids, from_date)
+        result_json = response.json()
+        orders = [
+            OrdercastOrder(
+                id=order["id"],
+                created_at=order["created_at"],
+                updated_at=order["updated_at"],
+            )
+            for order in result_json
+        ]
 
         result = []
         for order in orders:
@@ -451,7 +467,7 @@ class OrdercastManager:
 
         return result
 
-    def sync_orders(self, orders, odoo_repo: OdooRepo) -> None:
+    def sync_orders(self, orders: list[dict[str, Any]]) -> None:
         for order in orders:
             odoo_order = odoo_repo.get(key=RedisKeys.ORDERS, entity_id=order["id"])
             if odoo_order:
