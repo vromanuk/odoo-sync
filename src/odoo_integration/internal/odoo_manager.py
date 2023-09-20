@@ -738,14 +738,18 @@ class OdooManager:
             "objects": result,
         }
 
-    def receive_warehouses(self):
+    def receive_pickup_locations(self, partners: list[OdooUser]) -> dict[str, Any]:
+        partner_mapper = {p.id: p for p in partners}
         warehouses = self._client.get_objects("stock.warehouse", i18n_fields=["name"])
+        warehouses_names = get_entity_name_as_i18n(warehouses)
         result = []
         for warehouse in warehouses:
             warehouse_dto = {
                 "id": warehouse["id"],
                 "_remote_id": warehouse["id"],
                 "name": warehouse["name"],
+                "names": warehouses_names[warehouse["id"]],
+                "partner": partner_mapper["partner_id"],
             }
             result.append(warehouse_dto)
         return {

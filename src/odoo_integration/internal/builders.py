@@ -128,3 +128,17 @@ def get_delivery_option_data(delivery_option: dict[str, Any]) -> dict[str, Any]:
         "name": delivery_option.get("name"),
         "id": delivery_option["id"],
     }
+
+
+def get_pickup_location_data(pickup_location: dict[str, Any]) -> dict[str, Any]:
+    defaults_data = {}
+
+    if "name" in pickup_location and pickup_location["name"]:
+        defaults_data = {
+            "id": pickup_location["id"],
+            "name": pickup_location["name"],
+            "names": pickup_location.get("names", {}),
+        }
+        defaults_data.update(get_i18n_field_as_dict(pickup_location, "name"))
+
+    return defaults_data

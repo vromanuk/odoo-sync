@@ -14,6 +14,7 @@ from src.data import (
     OdooDeliveryOption,
     OdooProductVariant,
     OdooPriceRate,
+    OdooPickupLocation,
 )
 from .internal.builders import (
     get_partner_data,
@@ -33,6 +34,7 @@ from .internal.validators import (
     validate_product_variants,
     validate_attributes,
     validate_delivery_options,
+    validate_pickup_locations,
 )
 
 logger = structlog.getLogger(__name__)
@@ -56,7 +58,9 @@ class OdooSyncManager:
         logger.info("Start receiving products from Odoo")
         self.sync_products(full_sync=True)
 
-        logger.info("Start receiving order data from Odoo => delivery methods & pickup locations")
+        logger.info(
+            "Start receiving order data from Odoo => delivery methods & pickup locations"
+        )
         self.sync_delivery_methods_and_pickup_locations()
 
         logger.info("Start sync orders with Odoo")
@@ -72,7 +76,7 @@ class OdooSyncManager:
         logger.info("Started syncing user's data with Ordercast.")
         self.sync_users_from_odoo()
 
-    def sync_users_from_odoo(self):
+    def sync_users_from_odoo(self) -> None:
         existing_odoo_users = self.repo.get_list(key=RedisKeys.USERS)
         partners = self.odoo_manager.receive_partner_users(
             exclude_user_ids=[p.odoo_id for p in existing_odoo_users]
@@ -95,6 +99,10 @@ class OdooSyncManager:
                     odoo_id=user["erp_id"],
                     sync_date=datetime.now(timezone.utc),
                     email=user["email"],
+                    phone=user["phone"],
+                    city=user["city"],
+                    postcode=user["postcode"],
+                    street=user["street"],
                 )
                 for user in users_to_sync
             ],
@@ -311,12 +319,30 @@ class OdooSyncManager:
             # self.ordercast_manager.delete_delivery_options(to_delete)
             # self.repo.remove(to_delete)
 
-        warehouses = self.odoo_manager.receive_warehouses()
-        logger.info(
-            f"Received {len(warehouses['objects']) if warehouses and 'objects' in warehouses else 0} warehouses, start saving them."
+        pickup_locations = self.odoo_manager.receive_pickup_locations(
+            partners=self.repo.get_list(RedisKeys.USERS)
         )
-        if warehouses:
-            self.ordercast_manager.save_warehouse(warehouses, odoo_repo=self.repo)
+        logger.info(
+            f"Received {len(pickup_locations['objects']) if pickup_locations and 'objects' in pickup_locations else 0} warehouses, start saving them."
+        )
+        if pickup_locations:
+            validate_pickup_locations(pickup_locations)
+
+            pickup_locations_to_sync = [
+                get_delivery_option_data(pickup_location)
+                for pickup_location in pickup_locations["objects"]
+            ]
+
+            self.ordercast_manager.save_pickup_locations(pickup_locations_to_sync)
+            self.repo.insert_many(
+                key=RedisKeys.PICKUP_LOCATIONS,
+                entities=[
+                    OdooPickupLocation(
+                        odoo_id=pickup_location["id"], name=pickup_location["name"]
+                    )
+                    for pickup_location in pickup_locations_to_sync
+                ],
+            )
 
     def sync_orders_with_odoo(self, order_ids=None, from_date=None) -> None:
         orders = self.ordercast_manager.get_orders(

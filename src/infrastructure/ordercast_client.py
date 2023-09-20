@@ -30,6 +30,7 @@ from .ordercast_api_requests import (
     ListProductsRequest,
     UpsertPriceRatesRequest,
     AddDeliveryMethodRequest,
+    CreatePickupLocationRequest,
 )
 
 logger = structlog.getLogger(__name__)
@@ -250,6 +251,14 @@ class OrdercastApi:
     def add_delivery_method(self, request: AddDeliveryMethodRequest) -> Response:
         return httpx.post(
             url=f"{self.base_url}/delivery/",
+            json=request.model_dump(),
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def add_pickup_location(self, request: CreatePickupLocationRequest) -> Response:
+        return httpx.post(
+            url=f"{self.base_url}/company/pickup-location/",
             json=request.model_dump(),
             headers=self._auth_headers,
         )

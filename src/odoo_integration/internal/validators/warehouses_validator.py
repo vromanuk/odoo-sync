@@ -6,7 +6,7 @@ from ..helpers import is_empty, is_unique_by, is_length_not_in_range
 logger = structlog.getLogger(__name__)
 
 
-def validate_warehouses(warehouses) -> None:
+def validate_pickup_locations(warehouses) -> None:
     unique_names = set()
     has_error = False
     for warehouse in warehouses:

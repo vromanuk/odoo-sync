@@ -12,7 +12,7 @@ from src.data import (
     OdooAttribute,
     OdooProductVariant,
     OdooDeliveryOption,
-    OdooWarehouse,
+    OdooPickupLocation,
     OdooOrder,
     OdooBasketProduct,
     OdooCategory,
@@ -28,7 +28,7 @@ class RedisKeys(str, enum.Enum):
     CATEGORIES = "categories"
     PRODUCT_VARIANTS = "product_variants"
     DELIVERY_OPTIONS = "delivery_options"
-    WAREHOUSES = "warehouses"
+    PICKUP_LOCATIONS = "pickup_locations"
     ORDERS = "orders"
     BASKET_PRODUCT = "basket_product"
 
@@ -72,9 +72,9 @@ class OdooRepo:
                 "key": f"{self._prefix}:odoo:delivery_options",
                 "model": OdooDeliveryOption,
             },
-            RedisKeys.WAREHOUSES: {
-                "key": f"{self._prefix}:odoo:warehouses",
-                "model": OdooWarehouse,
+            RedisKeys.PICKUP_LOCATIONS: {
+                "key": f"{self._prefix}:odoo:pickup_locations",
+                "model": OdooPickupLocation,
             },
             RedisKeys.ORDERS: {
                 "key": f"{self._prefix}:odoo:orders",

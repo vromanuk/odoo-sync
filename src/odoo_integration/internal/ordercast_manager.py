@@ -5,7 +5,7 @@ import structlog
 from fastapi import Depends
 
 from src.data import (
-    OdooWarehouse,
+    OdooPickupLocation,
     OdooOrder,
     InvoiceStatus,
     OrderStatus,
@@ -37,6 +37,7 @@ from src.infrastructure import (
     UpsertPriceRatesRequest,
     PriceRate,
     AddDeliveryMethodRequest,
+    CreatePickupLocationRequest,
 )
 from .helpers import (
     get_i18n_field_as_dict,
@@ -44,7 +45,7 @@ from .helpers import (
 )
 from .odoo_repo import OdooRepo, RedisKeys
 from .validators import (
-    validate_warehouses,
+    validate_pickup_locations,
 )
 
 logger = structlog.getLogger(__name__)
@@ -327,6 +328,7 @@ class OrdercastManager:
         )
 
     def save_delivery_options(self, delivery_options: list[dict[str, Any]]) -> None:
+        logger.info("Adding delivery options to Ordercast")
         for delivery_option in delivery_options:
             self.ordercast_api.add_delivery_method(
                 request=AddDeliveryMethodRequest(
@@ -334,65 +336,14 @@ class OrdercastManager:
                 )
             )
 
-    def save_warehouse(self, warehouses_dict, odoo_repo: OdooRepo):
-        warehouses = warehouses_dict["objects"]
-        if not warehouses:
-            logger.info(f"Deleting warehouses.")
-            warehouse_ids = odoo_repo.get_list(RedisKeys.WAREHOUSES)
-            # TODO HANDLE
-            if warehouse_ids:
-                pass
-                # warehouses_for_delete = Warehouse.objects.exclude(id__in=warehouse_ids)
-                # WarehouseExternal.all_objects.filter(
-                #     warehouse_id__in=warehouses_for_delete.values_list('pk', flat=True)).delete()
-                # warehouses_for_delete.delete()
-
-        validate_warehouses(warehouses)
-
-        for warehouse in warehouses:
-            if "name" in warehouse and warehouse["name"]:
-                name = warehouse["name"]
-                i18n_fields = get_i18n_field_as_dict(warehouse, "name")
-                defaults_data = {"name": name}
-                defaults_data.update(i18n_fields)
-                # odoo_warehouse = WarehouseExternal.objects.filter(odoo_id=warehouse["id"]).first()
-                odoo_warehouse = odoo_repo.get(
-                    RedisKeys.WAREHOUSES, entity_id=warehouse["id"]
+    def save_pickup_locations(self, pickup_locations: list[dict[str, Any]]) -> None:
+        logger.info("Adding pickup locations to Ordercast")
+        for pickup_location in pickup_locations:
+            self.ordercast_api.add_pickup_location(
+                request=CreatePickupLocationRequest(
+                    name=I18Name(names=pickup_location["names"])
                 )
-                if odoo_warehouse:
-                    # saved = Warehouse.objects.update_or_create(id=odoo_warehouse.warehouse.id,
-                    #                                               defaults=defaults_data)
-                    saved = self.ordercast_api.create_warehouse()
-                else:
-                    defaults_data["is_removed"] = False
-                    # saved, _ = Warehouse.all_objects.update_or_create(name=name, defaults=defaults_data)
-                    saved = self.ordercast_api.create_warehouse()
-
-                    existing_odoo_warehouse = odoo_repo.get(
-                        key=RedisKeys.WAREHOUSES, entity_id=saved.id
-                    )
-
-                    if existing_odoo_warehouse:
-                        if not exists_in_all_ids(
-                            existing_odoo_warehouse.odoo_id, warehouses_dict
-                        ):
-                            existing_odoo_warehouse.odoo_id = warehouse["id"]
-                            existing_odoo_warehouse.save()
-                        elif existing_odoo_warehouse.odoo_id != warehouse["id"]:
-                            logger.warn(
-                                f"There is more than one '{warehouse['name']}' warehouse {[existing_odoo_warehouse.odoo_id, warehouse['id']]} in Odoo, so the first '{existing_odoo_warehouse.odoo_id}' is used. "
-                                f"Please inform Odoo administrators that warehouse names should be unified and stored only in one instance."
-                            )
-                        existing_odoo_warehouse.save()
-                    else:
-                        odoo_repo.insert(
-                            key=RedisKeys.WAREHOUSES,
-                            entity=OdooWarehouse(
-                                odoo_id=warehouse["id"], warehouse_id=saved.id
-                            ),
-                        )
-                warehouse["saved_id"] = saved.id
-                warehouse["saved"] = saved
+            )
 
     def get_orders(self, order_ids, odoo_repo: OdooRepo, from_date=None):
         orders = self.ordercast_api.get_orders(order_ids, from_date)
@@ -431,7 +382,7 @@ class OrdercastManager:
                 warehouse = order.warehouse
                 warehouse_dto = {"id": warehouse.id, "name": warehouse.name}
                 odoo_warehouse = odoo_repo.get(
-                    key=RedisKeys.WAREHOUSES, entity_id=warehouse.id
+                    key=RedisKeys.PICKUP_LOCATIONS, entity_id=warehouse.id
                 )
                 if odoo_warehouse:
                     warehouse_dto["_remote_id"] = odoo_warehouse.odoo_id

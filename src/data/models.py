@@ -43,6 +43,12 @@ class OdooOrder(OdooCommons):
 
 class OdooUser(OdooCommons):
     email: EmailStr
+    street: str
+    city: str
+    postcode: str
+    country: str
+    contact_name: str
+    contact_phone: str
     user: Optional[PositiveInt] = None
 
     @classmethod
@@ -55,8 +61,9 @@ class OdooDeliveryOption(OdooCommons):
     delivery_option: Optional[PositiveInt] = None
 
 
-class OdooWarehouse(OdooCommons):
-    warehouse: PositiveInt
+class OdooPickupLocation(OdooCommons):
+    name: str
+    warehouse: Optional[PositiveInt] = None
 
 
 class OdooAddress(OdooCommons):

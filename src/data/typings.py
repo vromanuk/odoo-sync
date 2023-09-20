@@ -7,7 +7,7 @@ from .models import (
     OdooAttribute,
     OdooOrder,
     OdooUser,
-    OdooWarehouse,
+    OdooPickupLocation,
     OdooDeliveryOption,
     OdooAddress,
     OdooBasketProduct,
@@ -22,7 +22,7 @@ OdooEntity = Union[
     | OdooOrder
     | OdooUser
     | OdooDeliveryOption
-    | OdooWarehouse
+    | OdooPickupLocation
     | OdooAddress
     | OdooBasketProduct
     | OdooPriceRate

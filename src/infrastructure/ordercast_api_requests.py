@@ -182,3 +182,14 @@ class AddDeliveryMethodRequest(BaseModel):
     should_attach_preparation_voucher: bool = False
     is_pickup: bool = False
     is_myself: bool = False
+
+
+class CreatePickupLocationRequest(BaseModel):
+    name: I18Name
+    street: str = "Smith Ave"
+    city: str = "Bradford"
+    postcode: str = "21701"
+    country: str = "UNITED_KINGDOM"
+    contact_name: str = "John Doe"
+    contact_phone: str = "+3281000000"
+    image: ImageObject = {}
