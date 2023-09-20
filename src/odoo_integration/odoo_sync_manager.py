@@ -20,6 +20,7 @@ from .internal.builders import (
     get_attribute_data,
     get_product_data,
     get_product_variant_data,
+    get_delivery_option_data,
 )
 from .internal.helpers import has_objects
 from .internal.odoo_manager import OdooManager, get_odoo_provider
@@ -282,7 +283,10 @@ class OdooSyncManager:
         if delivery_options:
             validate_delivery_options(delivery_options)
 
-            delivery_options_to_sync = []
+            delivery_options_to_sync = [
+                get_delivery_option_data(delivery_option)
+                for delivery_option in delivery_options["objects"]
+            ]
 
             self.ordercast_manager.save_delivery_options(delivery_options_to_sync)
             self.repo.insert_many(
@@ -295,15 +299,17 @@ class OdooSyncManager:
                 ],
             )
         else:
-            existing_odoo_delivery_options = self.repo.get_list(
-                key=RedisKeys.DELIVERY_OPTIONS
-            )
-            existing_ordercast_delivery_options = set()
-            to_delete = (
-                existing_ordercast_delivery_options - existing_odoo_delivery_options
-            )
-            self.ordercast_manager.delete_delivery_options(to_delete)
-            self.repo.remove(to_delete)
+            # TODO: enable
+            pass
+            # existing_odoo_delivery_options = self.repo.get_list(
+            #     key=RedisKeys.DELIVERY_OPTIONS
+            # )
+            # existing_ordercast_delivery_options = set()
+            # to_delete = (
+            #     existing_ordercast_delivery_options - existing_odoo_delivery_options
+            # )
+            # self.ordercast_manager.delete_delivery_options(to_delete)
+            # self.repo.remove(to_delete)
 
         warehouses = self.odoo_manager.receive_warehouses()
         logger.info(

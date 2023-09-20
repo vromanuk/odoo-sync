@@ -717,20 +717,24 @@ class OdooManager:
         delivery_options = self._client.get_objects(
             "delivery.carrier", i18n_fields=["name"]
         )
+        delivery_options_names = get_entity_name_as_i18n(delivery_options)
+
         result = []
+
         for delivery_option in delivery_options:
+            i18n_fields = get_i18n_field_as_dict(delivery_option, "name")
             delivery_option_dto = {
                 "id": delivery_option["id"],
                 "_remote_id": delivery_option["id"],
                 "name": delivery_option["name"],
+                "names": delivery_options_names[delivery_option["id"]],
             }
-            i18n_fields = get_i18n_field_as_dict(delivery_option, "name")
             delivery_option_dto.update(i18n_fields)
             result.append(delivery_option_dto)
         return {
             "all_ids": self._client.get_all_object_ids(
                 "delivery.carrier", [("is_published", "=", True)]
-            )(),
+            ),
             "objects": result,
         }
 
@@ -745,7 +749,7 @@ class OdooManager:
             }
             result.append(warehouse_dto)
         return {
-            "all_ids": self._client.get_all_object_ids("stock.warehouse")(),
+            "all_ids": self._client.get_all_object_ids("stock.warehouse"),
             "objects": result,
         }
 

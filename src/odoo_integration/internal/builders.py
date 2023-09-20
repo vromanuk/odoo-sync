@@ -119,3 +119,12 @@ def get_product_variant_data(
     defaults.update(i18n_fields)
 
     return defaults
+
+
+def get_delivery_option_data(delivery_option: dict[str, Any]) -> dict[str, Any]:
+    names = delivery_option.get("names", {})
+    return {
+        "names": names,
+        "name": delivery_option.get("name"),
+        "id": delivery_option["id"],
+    }

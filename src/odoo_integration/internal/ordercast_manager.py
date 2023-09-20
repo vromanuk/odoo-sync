@@ -5,7 +5,6 @@ import structlog
 from fastapi import Depends
 
 from src.data import (
-    OdooDeliveryOption,
     OdooWarehouse,
     OdooOrder,
     InvoiceStatus,
@@ -37,6 +36,7 @@ from src.infrastructure import (
     ListProductsRequest,
     UpsertPriceRatesRequest,
     PriceRate,
+    AddDeliveryMethodRequest,
 )
 from .helpers import (
     get_i18n_field_as_dict,
@@ -326,73 +326,13 @@ class OrdercastManager:
             ]
         )
 
-    def save_delivery_options(self, delivery_options_dict: dict[str, Any]):
-        self.ordercast_api.upsert
-
+    def save_delivery_options(self, delivery_options: list[dict[str, Any]]) -> None:
         for delivery_option in delivery_options:
-            if "name" in delivery_option and delivery_option["name"]:
-                name = delivery_option["name"]
-                i18n_fields = get_i18n_field_as_dict(delivery_option, "name")
-                defaults_data = {"name": name}
-                defaults_data.update(i18n_fields)
-                defaults_data["code"] = self.get_unique_code(
-                    name,
-                    "name",
-                    DeliveryOption.all_objects.exclude(
-                        id=delivery_option["id"]
-                    ).order_by("name"),
-                    "code",
-                    False,
-                    symbol_count=3,
-                    max_length=16,
+            self.ordercast_api.add_delivery_method(
+                request=AddDeliveryMethodRequest(
+                    name=I18Name(names=delivery_option["names"])
                 )
-
-                # external_delivery_option = DeliveryOptionExternal.objects.filter(
-                #     odoo_id=delivery_option["id"]).first()
-                odoo_delivery_option = odoo_repo.get(
-                    key=RedisKeys.DELIVERY_OPTIONS, entity_id=delivery_option["id"]
-                )
-                if odoo_delivery_option:
-                    # saved, _ = DeliveryOption.objects.update_or_create(
-                    #     id=odoo_delivery_option.delivery_option.id, defaults=defaults_data)
-                    # odoo_delivery_option.save()
-                    saved = self.ordercast_api.create_delivery_option()
-                else:
-                    defaults_data["is_removed"] = False
-                    # saved, _ = DeliveryOption.all_objects.update_or_create(name=name, defaults=defaults_data)
-                    saved = self.ordercast_api.create_delivery_option()
-
-                    existing_odoo_delivery_option = (
-                        DeliveryOptionExternal.all_objects.filter(
-                            delivery_option_id=saved.id
-                        ).first()
-                    )
-                    if existing_odoo_delivery_option:
-                        if not exists_in_all_ids(
-                            existing_odoo_delivery_option.odoo_id, delivery_options_dict
-                        ):
-                            existing_odoo_delivery_option.odoo_id = delivery_option[
-                                "id"
-                            ]
-                            existing_odoo_delivery_option.save()
-                        elif (
-                            existing_odoo_delivery_option.odoo_id
-                            != delivery_option["id"]
-                        ):
-                            logger.warn(
-                                f"There is more than one '{delivery_option['name']}' delivery option {[existing_odoo_delivery_option.odoo_id, delivery_option['id']]} in Odoo, so the first '{existing_odoo_delivery_option.odoo_id}' is used. "
-                                f"Please inform Odoo administrators that delivery option names should be unified and stored only in one instance."
-                            )
-                        existing_odoo_delivery_option.save()
-                    else:
-                        # DeliveryOptionExternal.objects.update_or_create(delivery_option_id=saved.id,
-                        #                                                 odoo_id=delivery_option["id"])
-                        odoo_repo.insert(
-                            key=RedisKeys.DELIVERY_OPTIONS,
-                            entity=OdooDeliveryOption(
-                                odoo_id=delivery_option["id"], delivery_option=saved.id
-                            ),
-                        )
+            )
 
     def save_warehouse(self, warehouses_dict, odoo_repo: OdooRepo):
         warehouses = warehouses_dict["objects"]

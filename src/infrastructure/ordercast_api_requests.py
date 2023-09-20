@@ -168,3 +168,17 @@ class UpsertProductVariantsRequest(BaseModel):
 class UpsertPriceRatesRequest(BaseModel):
     name: str
     show_recommended: bool = False
+
+
+class AddDeliveryMethodRequest(BaseModel):
+    name: I18Name
+    is_enabled: bool = True
+    minimum_amount: int = 0
+    tracking_url: str = "https://www.delivery.com/track?&tracknum="
+    is_payment_required: bool = False
+    is_tracking_code_generator_enabled: bool = False
+    ignore_is_merchant_payment_required: bool = False
+    allows_skip_order_processed_on_complete: bool = False
+    should_attach_preparation_voucher: bool = False
+    is_pickup: bool = False
+    is_myself: bool = False

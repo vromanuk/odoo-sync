@@ -29,6 +29,7 @@ from .ordercast_api_requests import (
     UpsertUnitsRequest,
     ListProductsRequest,
     UpsertPriceRatesRequest,
+    AddDeliveryMethodRequest,
 )
 
 logger = structlog.getLogger(__name__)
@@ -94,7 +95,7 @@ class OrdercastApi:
     ) -> Response:
         return httpx.post(
             url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping/",
-            data=request.model_dump(),
+            json=request.model_dump(),
             headers=self._auth_headers,
         )
 
@@ -168,7 +169,7 @@ class OrdercastApi:
     def create_order(self, request: CreateOrderRequest) -> Response:
         return httpx.post(
             url=f"{self.base_url}/order/?order_status_enum={request.order_status_enum}",
-            data=request.model_dump(),
+            json=request.model_dump(),
             headers=self._auth_headers,
         )
 
@@ -183,7 +184,7 @@ class OrdercastApi:
     def update_settings(self, request: UpdateSettingsRequest) -> Response:
         return httpx.put(
             url=f"{self.base_url}/company/settings/settings",
-            data=request.model_dump(),
+            json=request.model_dump(),
             headers=self._auth_headers,
         )
 
@@ -191,7 +192,7 @@ class OrdercastApi:
     def create_billing_address(self, request: CreateBillingAddressRequest) -> Response:
         return httpx.post(
             url=f"{self.base_url}/merchant/{request.merchant_id}/address/billing",
-            data=request.model_dump(),
+            json=request.model_dump(),
             headers=self._auth_headers,
         )
 
@@ -234,7 +235,7 @@ class OrdercastApi:
     def upsert_price_rate(self, request: UpsertPriceRatesRequest) -> Response:
         return httpx.post(
             url=f"{self.base_url}/price-rate",
-            data=request.model_dump(),
+            json=request.model_dump(),
             headers=self._auth_headers,
         )
 
@@ -242,6 +243,14 @@ class OrdercastApi:
     def get_price_rates(self) -> Response:
         return httpx.get(
             url=f"{self.base_url}/price-rate/",
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def add_delivery_method(self, request: AddDeliveryMethodRequest) -> Response:
+        return httpx.post(
+            url=f"{self.base_url}/delivery/",
+            json=request.model_dump(),
             headers=self._auth_headers,
         )
 
