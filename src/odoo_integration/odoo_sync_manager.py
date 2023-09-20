@@ -13,6 +13,7 @@ from .internal.builders import (
     get_product_data,
     get_product_variant_data,
     get_delivery_option_data,
+    get_pickup_location_data,
 )
 from .internal.helpers import has_objects
 from .internal.odoo_manager import OdooManager, get_odoo_provider
@@ -265,7 +266,7 @@ class OdooSyncManager:
             validate_pickup_locations(pickup_locations)
 
             pickup_locations_to_sync = [
-                get_delivery_option_data(pickup_location)
+                get_pickup_location_data(pickup_location)
                 for pickup_location in pickup_locations["objects"]
             ]
 

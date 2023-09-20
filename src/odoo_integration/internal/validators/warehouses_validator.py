@@ -1,3 +1,5 @@
+from typing import Any
+
 import structlog
 
 from ..exceptions import OdooSyncException
@@ -6,10 +8,15 @@ from ..helpers import is_empty, is_unique_by, is_length_not_in_range
 logger = structlog.getLogger(__name__)
 
 
-def validate_pickup_locations(warehouses) -> None:
+def validate_pickup_locations(pickup_locations: dict[str, Any]) -> None:
+    pickup_locations = pickup_locations["objects"]
+
+    if not pickup_locations:
+        return
+
     unique_names = set()
     has_error = False
-    for warehouse in warehouses:
+    for warehouse in pickup_locations:
         if is_empty(warehouse, "id"):
             logger.error(
                 f"Received warehouse with name '{warehouse['name']}' has no remote id. Please correct it in Odoo."

@@ -756,7 +756,7 @@ class OdooManager:
                 "_remote_id": warehouse["id"],
                 "name": warehouse["name"],
                 "names": warehouses_names[warehouse["id"]],
-                "partner": partner_mapper["partner_id"],
+                "partner": partner_mapper.get("partner_id", None),
             }
             result.append(warehouse_dto)
         return {

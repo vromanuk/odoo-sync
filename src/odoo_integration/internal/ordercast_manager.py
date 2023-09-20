@@ -5,7 +5,6 @@ import structlog
 from fastapi import Depends
 
 from src.data import (
-    OdooPickupLocation,
     OdooOrder,
     InvoiceStatus,
     OrderStatus,
@@ -39,14 +38,7 @@ from src.infrastructure import (
     AddDeliveryMethodRequest,
     CreatePickupLocationRequest,
 )
-from .helpers import (
-    get_i18n_field_as_dict,
-    exists_in_all_ids,
-)
 from .odoo_repo import OdooRepo, RedisKeys
-from .validators import (
-    validate_pickup_locations,
-)
 
 logger = structlog.getLogger(__name__)
 
@@ -341,7 +333,13 @@ class OrdercastManager:
         for pickup_location in pickup_locations:
             self.ordercast_api.add_pickup_location(
                 request=CreatePickupLocationRequest(
-                    name=I18Name(names=pickup_location["names"])
+                    name=I18Name(names=pickup_location["names"]),
+                    street=pickup_location["partner"]["street"],
+                    city=pickup_location["partner"]["city"],
+                    postcode=pickup_location["partner"]["postcode"],
+                    country=pickup_location["partner"]["country"],
+                    contact_name=pickup_location["partner"]["contact_name"],
+                    contact_phone=pickup_location["partner"]["contact_phone"],
                 )
             )
 
