@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any, Annotated
 
@@ -6,15 +5,7 @@ import structlog
 from fastapi import Depends
 
 from src.data import (
-    OdooUser,
-    OdooProduct,
-    OdooAttribute,
-    OdooCategory,
-    CategoryType,
-    OdooDeliveryOption,
-    OdooProductVariant,
     OdooPriceRate,
-    OdooPickupLocation,
 )
 from .internal.builders import (
     get_partner_data,
@@ -92,21 +83,7 @@ class OdooSyncManager:
         ]
 
         self.ordercast_manager.upsert_users(users_to_sync=users_to_sync)
-        self.repo.insert_many(
-            key=RedisKeys.USERS,
-            entities=[
-                OdooUser(
-                    odoo_id=user["erp_id"],
-                    sync_date=datetime.now(timezone.utc),
-                    email=user["email"],
-                    phone=user["phone"],
-                    city=user["city"],
-                    postcode=user["postcode"],
-                    street=user["street"],
-                )
-                for user in users_to_sync
-            ],
-        )
+        self.odoo_manager.save_users(users_to_sync=users_to_sync)
         self.sync_billing(users=users_to_sync)
 
     def sync_billing(self, users: list[dict[str, Any]]) -> None:
@@ -135,18 +112,7 @@ class OdooSyncManager:
         if categories:
             validate_categories(categories)
             self.ordercast_manager.save_categories(categories["objects"])
-            self.repo.insert_many(
-                key=RedisKeys.CATEGORIES,
-                entities=[
-                    OdooCategory(
-                        odoo_id=category["id"],
-                        name=category["name"],
-                        category_type=CategoryType.CLASS,
-                        sync_date=datetime.now(timezone.utc),
-                    )
-                    for category in categories["objects"]
-                ],
-            )
+            self.odoo_manager.save_categories(categories["objects"])
 
         return categories
 
@@ -169,17 +135,7 @@ class OdooSyncManager:
             self.ordercast_manager.save_attributes(
                 attributes_to_sync=attributes_to_sync
             )
-            self.repo.insert_many(
-                key=RedisKeys.ATTRIBUTES,
-                entities=[
-                    OdooAttribute(
-                        odoo_id=attribute["id"],
-                        name=attribute["name"],
-                        sync_date=datetime.now(timezone.utc),
-                    )
-                    for attribute in attributes_to_sync
-                ],
-            )
+            self.odoo_manager.save_attributes(attributes_to_sync)
 
         return attributes
 
@@ -211,13 +167,8 @@ class OdooSyncManager:
             ]
 
             self.ordercast_manager.save_products(products_to_sync)
-            self.repo.insert_many(
-                key=RedisKeys.PRODUCTS,
-                entities=[
-                    OdooProduct(odoo_id=product["id"], name=product["name"])
-                    for product in products_to_sync
-                ],
-            )
+            self.odoo_manager.save_products(products_to_sync)
+
         return products
 
     def sync_product_variants_to_ordercast(
@@ -273,15 +224,7 @@ class OdooSyncManager:
                 units=units,
                 default_price_rate=default_price_rate,
             )
-            self.repo.insert_many(
-                key=RedisKeys.PRODUCT_VARIANTS,
-                entities=[
-                    OdooProductVariant(
-                        odoo_id=product_variant["id"], name=product_variant["name"]
-                    )
-                    for product_variant in product_variants_to_sync
-                ],
-            )
+            self.odoo_manager.save_product_variants(product_variants_to_sync)
 
     def sync_delivery_methods_and_pickup_locations(self):
         delivery_options = self.odoo_manager.receive_delivery_options()
@@ -297,15 +240,8 @@ class OdooSyncManager:
             ]
 
             self.ordercast_manager.save_delivery_options(delivery_options_to_sync)
-            self.repo.insert_many(
-                key=RedisKeys.DELIVERY_OPTIONS,
-                entities=[
-                    OdooDeliveryOption(
-                        odoo_id=delivery_option["id"], name=delivery_option["name"]
-                    )
-                    for delivery_option in delivery_options_to_sync
-                ],
-            )
+            self.odoo_manager.save_delivery_options(delivery_options_to_sync)
+
         else:
             # TODO: enable
             pass
@@ -334,15 +270,7 @@ class OdooSyncManager:
             ]
 
             self.ordercast_manager.save_pickup_locations(pickup_locations_to_sync)
-            self.repo.insert_many(
-                key=RedisKeys.PICKUP_LOCATIONS,
-                entities=[
-                    OdooPickupLocation(
-                        odoo_id=pickup_location["id"], name=pickup_location["name"]
-                    )
-                    for pickup_location in pickup_locations_to_sync
-                ],
-            )
+            self.odoo_manager.save_pickup_locations(pickup_locations_to_sync)
 
     def sync_orders_with_odoo(self, order_ids=None, from_date=None) -> None:
         orders = self.ordercast_manager.get_orders(

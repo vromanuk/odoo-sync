@@ -13,6 +13,13 @@ from src.data import (
     OrderStatus,
     OdooOrder,
     OdooBasketProduct,
+    OdooCategory,
+    CategoryType,
+    OdooAttribute,
+    OdooProduct,
+    OdooProductVariant,
+    OdooDeliveryOption,
+    OdooPickupLocation,
 )
 from src.infrastructure import OdooClient, get_odoo_client
 from .exceptions import OdooSyncException
@@ -32,7 +39,7 @@ logger = structlog.getLogger(__name__)
 class OdooManager:
     def __init__(self, client: OdooClient, repo: OdooRepo):
         self._client = client
-        self._repo = repo
+        self.repo = repo
 
     def receive_partner_users(self, exclude_user_ids=None):
         users = self.receive_partners(
@@ -199,7 +206,7 @@ class OdooManager:
             # UserExternal.all_objects.update_or_create(
             #     user_id=user["id"], defaults={"odoo_id": remote_id, "is_removed": False}
             # )
-            self._repo.insert(
+            self.repo.insert(
                 key=RedisKeys.USERS,
                 entity=OdooUser(
                     odoo_id=remote_id,
@@ -347,7 +354,7 @@ class OdooManager:
                 )
                 if remote_id:
                     # AddressExternal.all_objects.filter(odoo_id=remote_id).delete()
-                    self._repo.remove(key=RedisKeys.ADDRESSES, entity_id=remote_id)
+                    self.repo.remove(key=RedisKeys.ADDRESSES, entity_id=remote_id)
 
         if create_remote_partner:
             remote_id = remote_partner_obj.create(send_partner)
@@ -357,7 +364,7 @@ class OdooManager:
         # AddressExternal.objects.update_or_create(
         #     address_id=partner["id"], odoo_id=remote_id, defaults={"is_removed": False}
         # )
-        self._repo.insert(
+        self.repo.insert(
             key=RedisKeys.ADDRESSES,
             entity=OdooAddress(
                 odoo_id=remote_id,
@@ -828,7 +835,7 @@ class OdooManager:
                 )
             create_remote_order = True
             remote_order_id = None
-            odoo_order = self._repo.get(key=RedisKeys.ORDERS, entity_id=order_dto["id"])
+            odoo_order = self.repo.get(key=RedisKeys.ORDERS, entity_id=order_dto["id"])
             if "_remote_id" in order_dto:
                 remote_order_id = order_dto["_remote_id"]
                 existing_remote_orders = remote_orders_obj.read(ids=[remote_order_id])
@@ -858,7 +865,7 @@ class OdooManager:
                 if odoo_order:
                     defaults["order_id"] = order_dto["id"]
                     defaults["odoo_id"] = remote_order_id
-                    self._repo.insert(
+                    self.repo.insert(
                         key=RedisKeys.ORDERS,
                         entity=OdooOrder(
                             odoo_id=remote_order_id,
@@ -868,7 +875,7 @@ class OdooManager:
                         ),
                     )
                 else:
-                    self._repo.insert(
+                    self.repo.insert(
                         key=RedisKeys.ORDERS,
                         entity=OdooOrder(
                             odoo_id=remote_order_id,
@@ -904,11 +911,11 @@ class OdooManager:
                             send_order_line
                         )
                         basket_product["_remote_id"] = remote_order_sale_id
-                    odoo_basket_product = self._repo.get(
+                    odoo_basket_product = self.repo.get(
                         key=RedisKeys.BASKET_PRODUCT, entity_id=basket_product["id"]
                     )
                     if odoo_basket_product:
-                        self._repo.insert(
+                        self.repo.insert(
                             key=RedisKeys.BASKET_PRODUCT,
                             entity=OdooBasketProduct(
                                 odoo_id=remote_order_sale_id,
@@ -916,7 +923,7 @@ class OdooManager:
                             ),
                         )
                     else:
-                        self._repo.insert(
+                        self.repo.insert(
                             key=RedisKeys.BASKET_PRODUCT,
                             entity=OdooBasketProduct(
                                 odoo_id=remote_order_sale_id,
@@ -925,7 +932,7 @@ class OdooManager:
                         )
 
     def receive_orders(self, from_date=None):
-        if not self._repo.get_len(RedisKeys.ORDERS):
+        if not self.repo.get_len(RedisKeys.ORDERS):
             logger.info(
                 "There are no order were send to Odoo, seems no orders created yet.",
                 "INFO",
@@ -1037,7 +1044,7 @@ class OdooManager:
                             order_line["product_id"]
                         )
                         if product_id:
-                            odoo_product = self._repo.get(
+                            odoo_product = self.repo.get(
                                 key=RedisKeys.PRODUCT_VARIANTS, entity_id=product_id
                             )
                             if odoo_product:
@@ -1058,6 +1065,98 @@ class OdooManager:
             result.append(order_dto)
 
         return result
+
+    def save_users(self, users_to_sync: list[dict[str, Any]]) -> None:
+        self.repo.insert_many(
+            key=RedisKeys.USERS,
+            entities=[
+                OdooUser(
+                    odoo_id=user["erp_id"],
+                    sync_date=datetime.now(timezone.utc),
+                    email=user["email"],
+                    phone=user["phone"],
+                    city=user["city"],
+                    postcode=user["postcode"],
+                    street=user["street"],
+                )
+                for user in users_to_sync
+            ],
+        )
+
+    def save_categories(self, categories: list[dict, str, Any]) -> None:
+        self.repo.insert_many(
+            key=RedisKeys.CATEGORIES,
+            entities=[
+                OdooCategory(
+                    odoo_id=category["id"],
+                    name=category["name"],
+                    category_type=CategoryType.CLASS,
+                    sync_date=datetime.now(timezone.utc),
+                )
+                for category in categories
+            ],
+        )
+
+    def save_attributes(self, attributes_to_sync: list[dict[str, Any]]) -> None:
+        self.repo.insert_many(
+            key=RedisKeys.ATTRIBUTES,
+            entities=[
+                OdooAttribute(
+                    odoo_id=attribute["id"],
+                    name=attribute["name"],
+                    sync_date=datetime.now(timezone.utc),
+                )
+                for attribute in attributes_to_sync
+            ],
+        )
+
+    def save_products(self, products_to_sync: list[dict[str, Any]]) -> None:
+        self.repo.insert_many(
+            key=RedisKeys.PRODUCTS,
+            entities=[
+                OdooProduct(odoo_id=product["id"], name=product["name"])
+                for product in products_to_sync
+            ],
+        )
+
+    def save_product_variants(
+        self, product_variants_to_sync: list[dict[str, Any]]
+    ) -> None:
+        self.repo.insert_many(
+            key=RedisKeys.PRODUCT_VARIANTS,
+            entities=[
+                OdooProductVariant(
+                    odoo_id=product_variant["id"], name=product_variant["name"]
+                )
+                for product_variant in product_variants_to_sync
+            ],
+        )
+
+    def save_delivery_options(
+        self, delivery_options_to_sync: list[dict[str, Any]]
+    ) -> None:
+        self.repo.insert_many(
+            key=RedisKeys.DELIVERY_OPTIONS,
+            entities=[
+                OdooDeliveryOption(
+                    odoo_id=delivery_option["id"], name=delivery_option["name"]
+                )
+                for delivery_option in delivery_options_to_sync
+            ],
+        )
+
+    def save_pickup_locations(
+        self, pickup_locations_to_sync: list[dict[str, Any]]
+    ) -> None:
+        self.repo.insert_many(
+            key=RedisKeys.PICKUP_LOCATIONS,
+            entities=[
+                OdooPickupLocation(
+                    odoo_id=pickup_location["id"], name=pickup_location["name"]
+                )
+                for pickup_location in pickup_locations_to_sync
+            ],
+        )
 
 
 # @lru_cache()
