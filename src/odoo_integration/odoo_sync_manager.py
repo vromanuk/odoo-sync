@@ -56,8 +56,8 @@ class OdooSyncManager:
         logger.info("Start receiving products from Odoo")
         self.sync_products(full_sync=True)
 
-        logger.info("Start receiving order data from Odoo")
-        self.sync_warehouses()
+        logger.info("Start receiving order data from Odoo => delivery methods & pickup locations")
+        self.sync_delivery_methods_and_pickup_locations()
 
         logger.info("Start sync orders with Odoo")
         self.sync_orders_with_odoo(
@@ -275,7 +275,7 @@ class OdooSyncManager:
                 ],
             )
 
-    def sync_warehouses(self):
+    def sync_delivery_methods_and_pickup_locations(self):
         delivery_options = self.odoo_manager.receive_delivery_options()
         logger.info(
             f"Received {len(delivery_options['objects']) if delivery_options and 'objects' in delivery_options else 0} delivery options, start saving them."
