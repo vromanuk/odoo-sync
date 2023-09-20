@@ -120,7 +120,7 @@ class OdooRepo:
             entity_key=f"{entity_key}:{entity.odoo_id}",
         )
 
-    def set(self, key: RedisKeys, entity: OdooEntity):
+    def set(self, key: RedisKeys, entity: OdooEntity) -> None:
         self._client.set(key=f"{self._prefix}:{key}", entity=entity.json())
 
     def remove(self, key: RedisKeys, entity_id: int) -> None:

@@ -12,7 +12,9 @@ logger = structlog.getLogger(__name__)
 
 class Partner:
     @classmethod
-    def build_from(cls, odoo_client: OdooClient, partner, remote_supported_langs=None):
+    def build_from(
+        cls, odoo_client: OdooClient, partner, remote_supported_langs=None
+    ) -> dict[str, Any]:
         partner_dto = {"id": partner["id"], "_remote_id": partner["id"]}
         if is_not_empty(partner, "street"):
             partner_dto["address_one"] = partner["street"]

@@ -158,7 +158,9 @@ class OrdercastManager:
         result_json = response.json()
         if result_json:
             return [
-                OrdercastProduct(id=product["id"], sku=product["sku"])
+                OrdercastProduct(
+                    id=product["id"], sku=product["sku"], name=product["name"]
+                )
                 for product in result_json["items"]
             ]
         return []

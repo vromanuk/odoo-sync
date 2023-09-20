@@ -44,7 +44,7 @@ class OdooSyncManager:
         self.odoo_manager = odoo_manager
         self.ordercast_manager = ordercast_manager
 
-    def sync(self):
+    def sync(self) -> None:
         logger.info("Start full syncing with Odoo.")
         self.sync_users()
 
@@ -228,7 +228,7 @@ class OdooSyncManager:
             )
             self.odoo_manager.save_product_variants(product_variants_to_sync)
 
-    def sync_delivery_methods_and_pickup_locations(self):
+    def sync_delivery_methods_and_pickup_locations(self) -> None:
         delivery_options = self.odoo_manager.receive_delivery_options()
         logger.info(
             f"Received {len(delivery_options['objects']) if delivery_options and 'objects' in delivery_options else 0} delivery options, start saving them."

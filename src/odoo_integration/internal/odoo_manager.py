@@ -482,7 +482,7 @@ class OdooManager:
         )
         discounts = self._client.get_discounts()
 
-        def get_attribute(attribute_ids):
+        def get_attribute(attribute_ids: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if product_template_attributes and attribute_ids:
                 result_ids = []
                 for attribute in product_template_attributes:
@@ -648,7 +648,7 @@ class OdooManager:
 
     def get_product_attributes(
         self, from_date: Optional[datetime] = None, attribute_from_date=None
-    ):
+    ) -> dict[str, Any]:
         attributes = self.get_remote_updated_objects(
             "product.attribute", from_date=from_date, i18n_fields=["name"]
         )
@@ -720,7 +720,7 @@ class OdooManager:
             for unit in units
         ]
 
-    def receive_delivery_options(self):
+    def receive_delivery_options(self) -> None:
         delivery_options = self._client.get_objects(
             "delivery.carrier", i18n_fields=["name"]
         )
@@ -1086,7 +1086,7 @@ class OdooManager:
             ],
         )
 
-    def save_categories(self, categories: list[dict, str, Any]) -> None:
+    def save_categories(self, categories: list[dict[str, Any]]) -> None:
         self.repo.insert_many(
             key=RedisKeys.CATEGORIES,
             entities=[

@@ -14,13 +14,13 @@ class RedisClient:
             host=config.HOST, port=config.PORT, db=0, decode_responses=True
         )
 
-    def get(self, key: str):
+    def get(self, key: str) -> Any:
         return self._client.get(key)
 
     def set(self, key: str, entity: str) -> None:
         self._client.set(name=key, value=entity)
 
-    def get_many(self, key: str) -> list:
+    def get_many(self, key: str) -> list[OdooEntity]:
         entity_ids = self._client.sscan_iter(key)
 
         pipeline = self._client.pipeline()
@@ -29,7 +29,7 @@ class RedisClient:
 
         return pipeline.execute()
 
-    def insert(self, entity, entities_key: str, entity_key: str, pipeline=None):
+    def insert(self, entity, entities_key: str, entity_key: str, pipeline=None) -> None:
         is_single_insert = False
         if not pipeline:
             is_single_insert = True
@@ -58,7 +58,7 @@ class RedisClient:
     def ping(self):
         return self._client.ping()
 
-    def length(self, key: str):
+    def length(self, key: str) -> int:
         return self._client.scard(key)
 
 

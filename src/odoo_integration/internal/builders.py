@@ -8,7 +8,7 @@ from .helpers import is_empty, get_i18n_field_as_dict
 def get_partner_data(partner: dict[str, Any]) -> dict[str, Any]:
     language = (
         partner.get("language", "fr")
-        if partner.get("language") and len(partner.get("language")) == 2
+        if partner.get("language") and len(partner.get("language", [])) == 2
         else "fr"
     )
     website = (
@@ -76,7 +76,7 @@ def get_product_variant_data(
     product_variant: dict[str, Any],
     odoo_products: list[dict[str, Any]],
     ordercast_products: list[OrdercastProduct],
-    odoo_attributes: list[dict, str, Any],
+    odoo_attributes: list[dict[str, Any]],
     ordercast_attributes: list[OrdercastAttribute],
 ) -> dict[str, Any]:
     ordercast_product_mapper = {p.sku: p.id for p in ordercast_products}

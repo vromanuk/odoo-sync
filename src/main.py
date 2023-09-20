@@ -45,7 +45,7 @@ def configure_logging():
 
 
 @app.on_event("startup")
-async def startup():
+async def startup() -> None:
     configure_logging()
 
 
