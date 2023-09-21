@@ -41,7 +41,9 @@ class OdooManager:
         self._client = client
         self.repo = repo
 
-    def receive_partner_users(self, exclude_user_ids=None):
+    def receive_partner_users(
+        self, exclude_user_ids: Optional[list[int]] = None
+    ) -> list[dict[str, Any]]:
         users = self.receive_partners(
             exclude_user_ids=exclude_user_ids, partner_type=PartnerType.USER
         )
@@ -81,8 +83,11 @@ class OdooManager:
         return result
 
     def receive_partners(
-        self, exclude_user_ids=None, parent_ids=None, partner_type=None
-    ):
+        self,
+        exclude_user_ids: Optional[list[int]] = None,
+        parent_ids: Optional[list[int]] = None,
+        partner_type: Optional[PartnerType] = None,
+    ) -> list[dict[str, Any]]:
         api_filter_criteria = [
             ("is_company", "=", False),
             ("active", "in", [True, False]),
@@ -128,7 +133,7 @@ class OdooManager:
             for partner in partners
         ]
 
-    def sync_users(self, users):
+    def sync_users(self, users: list[dict[str, Any]]) -> None:
         remote_users_obj = self._client["res.partner"]
         remote_supported_langs = self._client.get_objects("res.lang")
         for user in users:
@@ -270,7 +275,7 @@ class OdooManager:
                         logger.error(f"{str(exc)}")
             external_addresses_for_delete.delete()
 
-    def sync_partner(self, partner):
+    def sync_partner(self, partner: dict[str, Any]) -> None:
         client = self._client
         remote_partner_obj = client["res.partner"]
         # if '_remote_id' not in partner:
@@ -419,13 +424,13 @@ class OdooManager:
 
     def get_remote_updated_objects(
         self,
-        remote_object_name,
-        object_external=None,
-        from_date=None,
-        sync_from_last_time=False,
-        i18n_fields=None,
-        filter_criteria=None,
-    ):
+        remote_object_name: str,
+        object_external: Any = None,
+        from_date: Optional[datetime] = None,
+        sync_from_last_time: Optional[datetime] = False,
+        i18n_fields: list[str] = None,
+        filter_criteria: Any = None,
+    ) -> Any:
         api_filter_criteria = []
         if filter_criteria and isinstance(filter_criteria, list):
             api_filter_criteria.extend(filter_criteria)
@@ -647,7 +652,9 @@ class OdooManager:
         }
 
     def get_product_attributes(
-        self, from_date: Optional[datetime] = None, attribute_from_date=None
+        self,
+        from_date: Optional[datetime] = None,
+        attribute_from_date: Optional[datetime] = None,
     ) -> dict[str, Any]:
         attributes = self.get_remote_updated_objects(
             "product.attribute", from_date=from_date, i18n_fields=["name"]
@@ -720,7 +727,7 @@ class OdooManager:
             for unit in units
         ]
 
-    def receive_delivery_options(self) -> None:
+    def receive_delivery_options(self) -> list[dict[str, Any]]:
         delivery_options = self._client.get_objects(
             "delivery.carrier", i18n_fields=["name"]
         )

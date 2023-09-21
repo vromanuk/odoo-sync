@@ -101,7 +101,7 @@ class OrdercastManager:
     def create_shipping_address(
         self,
         user: dict[str, Any],
-    ):
+    ) -> None:
         for shipping_address in user["odoo_data"]["shipping_addresses"]:
             self.ordercast_api.create_shipping_address(
                 CreateShippingAddressRequest(
@@ -116,15 +116,17 @@ class OrdercastManager:
                 )
             )
 
-    def get_billing_addresses(self, merchant_id: int):
-        return self.ordercast_api.list_billing_addresses(
+    def get_billing_addresses(self, merchant_id: int) -> list[dict[str, Any]]:
+        response = self.ordercast_api.list_billing_addresses(
             ListBillingAddressesRequest(merchant_id=merchant_id)
         )
+        return response.json()
 
-    def get_shipping_addresses(self, merchant_id: int):
-        return self.ordercast_api.list_shipping_addresses(
+    def get_shipping_addresses(self, merchant_id: int) -> list[dict[str, Any]]:
+        response = self.ordercast_api.list_shipping_addresses(
             ListShippingAddressesRequest(merchant_id=merchant_id)
         )
+        return response.json()
 
     def set_default_language(self, locale: Locale) -> None:
         self.ordercast_api.update_default_language(locale)
@@ -205,7 +207,9 @@ class OrdercastManager:
             None,
         )
 
-    def get_address(self, address, odoo_repo: OdooRepo):
+    def get_address(
+        self, address: dict[str, Any], odoo_repo: OdooRepo
+    ) -> dict[str, Any]:
         if address:
             address_dto = {
                 "id": address.id,
@@ -350,7 +354,7 @@ class OrdercastManager:
         self,
         order_ids: Optional[list[int]] = None,
         from_date: Optional[datetime] = None,
-    ):
+    ) -> list[OrdercastOrder]:
         logger.info("Receiving orders from Ordercast")
         # TODO handle pagination
         response = self.ordercast_api.get_orders(order_ids, from_date)

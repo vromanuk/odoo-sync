@@ -1,3 +1,5 @@
+from typing import Any
+
 import structlog
 
 from ..exceptions import OdooSyncException
@@ -11,7 +13,7 @@ from ..helpers import (
 logger = structlog.getLogger(__name__)
 
 
-def validate_products(products) -> None:
+def validate_products(products: dict[str, Any]) -> None:
     products = products["objects"]
     if not products:
         return

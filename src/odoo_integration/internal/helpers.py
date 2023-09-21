@@ -1,6 +1,6 @@
 import re
 from collections import defaultdict
-from typing import Any
+from typing import Any, Optional
 
 import regex as regexp
 
@@ -48,7 +48,10 @@ def is_length_in_range(value, min_length, max_length):
 
 
 def get_i18n_field_as_dict(
-    data: dict, field: str, rename_field: str = None, reg_exp: str = None
+    data: dict,
+    field: str,
+    rename_field: Optional[str] = None,
+    reg_exp: Optional[str] = None,
 ) -> dict[str, Any]:
     result = {}
     field_name = rename_field or field

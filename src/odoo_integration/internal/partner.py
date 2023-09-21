@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 import structlog
 
@@ -13,7 +13,10 @@ logger = structlog.getLogger(__name__)
 class Partner:
     @classmethod
     def build_from(
-        cls, odoo_client: OdooClient, partner, remote_supported_langs=None
+        cls,
+        odoo_client: OdooClient,
+        partner: dict[str, Any],
+        remote_supported_langs: Optional[list[dict[str, Any]]] = None,
     ) -> dict[str, Any]:
         partner_dto = {"id": partner["id"], "_remote_id": partner["id"]}
         if is_not_empty(partner, "street"):

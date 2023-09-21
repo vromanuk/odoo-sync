@@ -1,4 +1,4 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, Awaitable
 
 import redis
 from fastapi import Depends
@@ -29,7 +29,9 @@ class RedisClient:
 
         return pipeline.execute()
 
-    def insert(self, entity, entities_key: str, entity_key: str, pipeline=None) -> None:
+    def insert(
+        self, entity: Any, entities_key: str, entity_key: str, pipeline: Any = None
+    ) -> None:
         is_single_insert = False
         if not pipeline:
             is_single_insert = True
@@ -55,10 +57,10 @@ class RedisClient:
     def remove(self, key: str) -> None:
         self._client.unlink(key)
 
-    def ping(self):
+    def ping(self) -> Any:
         return self._client.ping()
 
-    def length(self, key: str) -> int:
+    def length(self, key: str) -> Awaitable[int] | int:
         return self._client.scard(key)
 
 

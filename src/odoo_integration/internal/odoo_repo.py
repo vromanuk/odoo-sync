@@ -1,5 +1,5 @@
 import enum
-from typing import Optional, Annotated
+from typing import Optional, Annotated, Any
 
 from fastapi import Depends
 
@@ -97,9 +97,9 @@ class OdooRepo:
         ]
 
     def get(self, key: RedisKeys, entity_id: int) -> Optional[OdooEntity]:
-        entity_schema = self._schema.get(key)
-        entity_key = entity_schema.get("key")
-        entity_model = entity_schema.get("model")
+        entity_schema = self._schema[key]
+        entity_key = entity_schema["key"]
+        entity_model = entity_schema["model"]
 
         entity_json = self._client.get(f"{entity_key}:{entity_id}")
         return entity_model.from_json(entity_json) if entity_json else None
@@ -129,10 +129,10 @@ class OdooRepo:
 
         self._client.remove(f"{entity_key}:{entity_id}")
 
-    def get_key(self, key: RedisKeys):
+    def get_key(self, key: RedisKeys) -> Any:
         return self._client.get(f"{self._prefix}:{key}")
 
-    def get_len(self, key: RedisKeys):
+    def get_len(self, key: RedisKeys) -> int:
         return self._client.length(f"{self._prefix}:{key}")
 
 

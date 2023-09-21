@@ -65,7 +65,7 @@ class OdooSyncManager:
         )
         # self.check_deletion()?
 
-    def sync_users(self):
+    def sync_users(self) -> None:
         logger.info("Started syncing user's data with Ordercast.")
         self.sync_users_from_odoo()
 

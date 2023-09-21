@@ -12,7 +12,7 @@ app = FastAPI(title="Odoo Sync", openapi_url="/v1/openapi.json")
 app.include_router(api_router, prefix=settings.APP.API_PREFIX)
 
 
-def configure_logging():
+def configure_logging() -> None:
     env = settings.APP.ENV
     shared_processors = [
         structlog.contextvars.merge_contextvars,

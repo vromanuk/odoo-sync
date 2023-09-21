@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any, Optional
 
 from fastapi import Depends
 from odoo_rpc_client import Client
@@ -18,7 +18,9 @@ class OdooClient:
             protocol=self._config.ODOO_PROTOCOL,
         )
 
-    def get_objects(self, object_name, criteria=None, i18n_fields=None):
+    def get_objects(
+        self, object_name: str, criteria: Any = None, i18n_fields: Any = None
+    ) -> Any:
         if criteria is None:
             criteria = []
 
@@ -27,7 +29,12 @@ class OdooClient:
             self.init_i18n(object_name, remote_results, i18n_fields)
         return remote_results
 
-    def init_i18n(self, resource, list_data: list, fields: list):
+    def init_i18n(
+        self,
+        resource: Any,
+        list_data: list[dict[str, Any]],
+        fields: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         remote_langs = self._client["res.lang"].search_read(domain=[])
         if remote_langs:
             for lang in remote_langs:
@@ -46,7 +53,7 @@ class OdooClient:
                                 break
         return list_data
 
-    def get_object(self, obj):
+    def get_object(self, obj: Any) -> dict[str, Any]:
         if (
             isinstance(obj, list) and len(obj) > 1
         ):  # clear [int, str] mixed lists, leave only fist type
@@ -63,13 +70,13 @@ class OdooClient:
 
         return obj
 
-    def get_object_id(self, obj):
-        object = self.get_object(obj)
-        if isinstance(object, list) and len(object) > 0:
-            return object[0]
-        return obj
+    def get_object_id(self, obj: str) -> Any:
+        odoo_object = self.get_object(obj)
+        if isinstance(odoo_object, list) and len(odoo_object) > 0:
+            return odoo_object[0]
+        return odoo_object
 
-    def get_all_object_ids(self, object_name, domain=None):
+    def get_all_object_ids(self, object_name: str, domain: Any = None) -> list[int]:
         if not domain:
             domain = []
         remote_results = self._client[object_name].search_read(
