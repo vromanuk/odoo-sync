@@ -727,7 +727,7 @@ class OdooManager:
             for unit in units
         ]
 
-    def receive_delivery_options(self) -> list[dict[str, Any]]:
+    def receive_delivery_options(self) -> dict[str, Any]:
         delivery_options = self._client.get_objects(
             "delivery.carrier", i18n_fields=["name"]
         )
