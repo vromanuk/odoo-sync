@@ -362,9 +362,7 @@ class OrdercastManager:
             for order in result_json["items"]
         ]
 
-    def get_address(
-        self, address: dict[str, Any], odoo_repo: OdooRepo
-    ) -> dict[str, Any]:
+    def get_address(self, address: dict[str, Any]) -> dict[str, Any]:
         if address:
             address_dto = {
                 "id": address.id,
