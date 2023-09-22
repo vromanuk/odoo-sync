@@ -52,7 +52,9 @@ def error_handler(func: Callable[..., Response]) -> Callable[..., Response]:
         stop=tenacity.stop_after_attempt(3),
         retry=tenacity.retry_if_not_exception_type(OrdercastApiValidationException),
     )
-    def wrapper(self: "OrdercastApi", *args: tuple[Any], **kwargs: dict[str, Any]) -> Response:
+    def wrapper(
+        self: "OrdercastApi", *args: tuple[Any], **kwargs: dict[str, Any]
+    ) -> Response:
         try:
             response = func(self, *args, **kwargs)
             func_name = func.__qualname__
@@ -104,7 +106,7 @@ class OrdercastApi:
 
     @error_handler
     def create_shipping_address(
-            self, request: CreateShippingAddressRequest
+        self, request: CreateShippingAddressRequest
     ) -> Response:
         return httpx.post(
             url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping/",
@@ -121,7 +123,7 @@ class OrdercastApi:
 
     @error_handler
     def list_shipping_addresses(
-            self, request: ListShippingAddressesRequest
+        self, request: ListShippingAddressesRequest
     ) -> Response:
         return httpx.get(
             url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping/",
@@ -162,7 +164,7 @@ class OrdercastApi:
 
     @error_handler
     def upsert_product_variants(
-            self, request: list[UpsertProductVariantsRequest]
+        self, request: list[UpsertProductVariantsRequest]
     ) -> Response:
         return httpx.post(
             url=f"{self.base_url}/product/variant/",
@@ -294,6 +296,6 @@ class OrdercastApi:
 
 # @lru_cache()
 def get_ordercast_api(
-        settings: Annotated[Settings, Depends(get_settings)]
+    settings: Annotated[Settings, Depends(get_settings)]
 ) -> OrdercastApi:
     return OrdercastApi(settings.ORDERCAST)
