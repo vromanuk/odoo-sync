@@ -149,7 +149,7 @@ class OdooSyncManager:
         )
         products = self.odoo_manager.get_products(last_sync_date)
 
-        logger.info(f"Connected to Odoo")
+        logger.info("Connected to Odoo")
         logger.info(
             f"Received {len(products['objects']) if has_objects(products) else 0} products, start saving them."
         )
@@ -194,7 +194,7 @@ class OdooSyncManager:
         if has_product_variants:
             validate_product_variants(product_variants["objects"])
             logger.info(
-                f"Starting saving product variants after saving categories and attributes."
+                "Starting saving product variants after saving categories and attributes."
             )
             default_price_rate = self.repo.get_key(RedisKeys.DEFAULT_PRICE_RATE)
 
@@ -279,7 +279,9 @@ class OdooSyncManager:
         order_ids: Optional[list[int]] = None,
         from_date: Optional[datetime] = None,
     ) -> None:
-        orders = self.ordercast_manager.get_orders(order_ids, from_date=from_date)
+        orders = self.ordercast_manager.get_orders_for_sync(
+            order_ids=order_ids, from_date=from_date
+        )
         logger.info(f"Loaded {len(orders)} orders, start sending them to Odoo.")
         self.odoo_manager.sync_orders(orders)
 

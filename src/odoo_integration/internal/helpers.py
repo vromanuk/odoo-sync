@@ -4,14 +4,7 @@ from typing import Any, Optional
 
 import regex as regexp
 
-SUPPORTED_LANGUAGES = {
-    "en": "English",
-    "fr": "French",
-    "de": "German",
-    "nl": "Dutch",
-    "it": "Italian",
-    "tr": "Turkish",
-}
+from .constants import SUPPORTED_LANGUAGES
 
 
 def is_not_empty(values_dict, key):

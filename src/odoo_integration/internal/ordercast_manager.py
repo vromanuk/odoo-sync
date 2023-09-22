@@ -14,6 +14,7 @@ from src.data import (
     OrdercastAttribute,
     OrdercastCategory,
     OrdercastOrder,
+    OrdercastOrderStatus,
 )
 from src.infrastructure import (
     OrdercastApi,
@@ -38,7 +39,9 @@ from src.infrastructure import (
     PriceRate,
     AddDeliveryMethodRequest,
     CreatePickupLocationRequest,
+    ListOrdersRequest,
 )
+from .constants import ORDER_STATUSES_FOR_SYNC
 from .odoo_repo import OdooRepo, RedisKeys
 
 logger = structlog.getLogger(__name__)
@@ -350,26 +353,65 @@ class OrdercastManager:
                 )
             )
 
+    def get_order_statuses(self) -> list[OrdercastOrderStatus]:
+        logger.info("Receiving order statuses from Ordercast")
+
+        response = self.ordercast_api.get_order_statuses()
+
+        logger.info(f"Received {len(response.json())} order statuses from Ordercast")
+
+        return [
+            OrdercastOrderStatus(
+                id=status["id"], name=status["name"], enum=status["enum"]
+            )
+            for status in response.json()
+        ]
+
     def get_orders(
         self,
+        statuses: list[OrdercastOrderStatus],
         order_ids: Optional[list[int]] = None,
         from_date: Optional[datetime] = None,
     ) -> list[OrdercastOrder]:
+        status_ids = [
+            status.id for status in statuses if status.enum in ORDER_STATUSES_FOR_SYNC
+        ]
+
         logger.info("Receiving orders from Ordercast")
+
         # TODO handle pagination
-        response = self.ordercast_api.get_orders(order_ids, from_date)
+        response = self.ordercast_api.get_orders_for_sync(
+            request=ListOrdersRequest(
+                statuses=status_ids, order_ids=order_ids, from_date=from_date
+            )
+        )
         result_json = response.json()
-        orders = [
+
+        logger.info(f"Received {len(result_json['items'])} orders to sync")
+
+        return [
             OrdercastOrder(
                 id=order["id"],
                 created_at=order["created_at"],
                 updated_at=order["updated_at"],
             )
-            for order in result_json
+            for order in result_json["items"]
         ]
 
+    def get_orders_for_sync(
+        self,
+        order_ids: Optional[list[int]] = None,
+        from_date: Optional[datetime] = None,
+    ) -> list[dict[str, Any]]:
+        statuses = self.get_order_statuses()
+
+        orders_to_sync = self.get_orders(
+            statuses=statuses, order_ids=order_ids, from_date=from_date
+        )
+
         result = []
-        for order in orders:
+        for order in orders_to_sync:
+            self.ordercast_api.get_order(order.id)
             order_dto = {
                 "id": order.id,
                 "name": f"OC{str(order.id).zfill(5)}",
@@ -572,7 +614,7 @@ class OrdercastManager:
                     )
             existing_order.save()
         except Exception as exc:
-            logger.error(f"Error during updating order status locally.")
+            logger.error("Error during updating order status locally.")
             raise exc
 
 

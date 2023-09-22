@@ -29,3 +29,9 @@ class OrdercastOrder(OrdercastCommon):
     id: PositiveInt
     created_at: datetime
     updated_at: datetime
+
+
+class OrdercastOrderStatus(OrdercastCommon):
+    id: PositiveInt
+    name: str
+    enum: int

@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from fastapi import Depends
 from odoo_rpc_client import Client

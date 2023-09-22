@@ -28,6 +28,12 @@ class OrderStatus(str, enum.Enum):
     CANCELLED_BY_ADMIN_STATUS = "admin_canceled"
 
 
+class OrderStatusForSync(enum.Enum):
+    IN_PROGRESS = 1
+    PROCESSED = 3
+    CANCELLED_BY_ADMIN = 6
+
+
 class InvoiceStatus(str, enum.Enum):
     INV_NO_STATUS = "no"
     INV_TO_INVOICE_STATUS = "to invoice"

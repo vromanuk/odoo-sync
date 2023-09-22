@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional, Any
 
 from pydantic import BaseModel, PositiveInt, model_serializer
@@ -79,7 +80,9 @@ class ListProductsRequest(BasePaginatedRequest):
 
 
 class ListOrdersRequest(BasePaginatedRequest):
-    pass
+    statuses: list[PositiveInt]
+    order_ids: Optional[list[int]] = None
+    from_date: Optional[datetime] = None
 
 
 class CreateOrderRequest(BaseModel):

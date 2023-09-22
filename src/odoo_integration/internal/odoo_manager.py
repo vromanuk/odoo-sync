@@ -177,7 +177,7 @@ class OdooManager:
                         f"User with remote id '{remote_id}' not exists in Odoo, it seems it was deleted there."
                     )
                     logger.info(
-                        f"To preserve the integrity of the synchronization, it will be created a new in Odoo."
+                        "To preserve the integrity of the synchronization, it will be created a new in Odoo."
                     )
                     logger.info(
                         f"Try first to find existing user in Odoo by email '{copy_user['email']}'."
@@ -200,7 +200,7 @@ class OdooManager:
                         create_remote_user = False
                     else:
                         logger.info(
-                            f"No user found in Odoo. Try to create anew in Odoo."
+                            "No user found in Odoo. Try to create anew in Odoo."
                         )
 
             if create_remote_user:
@@ -242,7 +242,7 @@ class OdooManager:
                     self.sync_partner(shipping_address)
 
         # sync deleted local addresses with remote partners
-        logger.info(f"Deleting unused addresses.")
+        logger.info("Deleting unused addresses.")
         # external_addresses_for_delete = AddressExternal.all_objects.filter(
         #     address_id__isnull=True, original_address_id__isnull=False
         # )

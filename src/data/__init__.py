@@ -5,6 +5,7 @@ from .enums import (
     OrderStatus,
     InvoiceStatus,
     Locale,
+    OrderStatusForSync,
 )
 from .models import (
     OdooUser,
@@ -27,6 +28,7 @@ from .ordercast_models import (
     OrdercastAttribute,
     OrdercastCategory,
     OrdercastOrder,
+    OrdercastOrderStatus,
 )
 from .typings import OdooEntity
 
@@ -56,4 +58,6 @@ __all__ = (
     "OrdercastCategory",
     "OdooPriceRate",
     "OrdercastOrder",
+    "OrderStatusForSync",
+    "OrdercastOrderStatus",
 )

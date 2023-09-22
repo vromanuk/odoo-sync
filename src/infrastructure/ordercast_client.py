@@ -160,9 +160,12 @@ class OrdercastApi:
         )
 
     @error_handler
-    def get_orders(self, request: ListOrdersRequest) -> Response:
+    def get_orders_for_sync(self, request: ListOrdersRequest) -> Response:
+        statuses = "&".join(
+            [f"status_ids={status_id}" for status_id in request.statuses]
+        )
         return httpx.get(
-            url=f"{self.base_url}/order/?pageIndex={request.pageIndex}&pageSize={request.pageSize}&prevId={request.prevId}",
+            url=f"{self.base_url}/order/?pageIndex={request.pageIndex}&pageSize={request.pageSize}&prevId={request.prevId}&{statuses}",
             headers=self._auth_headers,
         )
 
@@ -260,6 +263,20 @@ class OrdercastApi:
         return httpx.post(
             url=f"{self.base_url}/company/pickup-location/",
             json=request.model_dump(),
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def get_order_statuses(self) -> Response:
+        return httpx.get(
+            url=f"{self.base_url}/order/status/",
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def get_order(self, order_id: int) -> Response:
+        return httpx.get(
+            url=f"{self.base_url}/order/{order_id}/",
             headers=self._auth_headers,
         )
 
