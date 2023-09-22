@@ -70,9 +70,9 @@ class OdooSyncManager:
         self.sync_users_from_odoo()
 
     def sync_users_from_odoo(self) -> None:
-        existing_odoo_users = self.repo.get_list(key=RedisKeys.USERS)
+        # existing_odoo_users = self.repo.get_list(key=RedisKeys.USERS)
         partners = self.odoo_manager.receive_partner_users(
-            exclude_user_ids=[p.odoo_id for p in existing_odoo_users]
+            exclude_user_ids=[p.odoo_id for p in []]
         )
         validate_partners(
             partners=partners, ordercast_users=self.ordercast_manager.get_users()

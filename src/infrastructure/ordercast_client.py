@@ -1,9 +1,10 @@
 import functools
 from http import HTTPStatus
-from typing import Annotated
+from typing import Annotated, Callable, Any
 
 import httpx
 import structlog
+import tenacity
 from fastapi import Depends
 from httpx import Response
 
@@ -36,16 +37,26 @@ from .ordercast_api_requests import (
 
 logger = structlog.getLogger(__name__)
 
-OK_STATUSES = [HTTPStatus.OK, HTTPStatus.CREATED, HTTPStatus.NO_CONTENT]
+OK_STATUSES = {HTTPStatus.OK, HTTPStatus.CREATED, HTTPStatus.NO_CONTENT}
+CLIENT_ERRORS = {
+    HTTPStatus.UNPROCESSABLE_ENTITY,
+    HTTPStatus.NOT_FOUND,
+    HTTPStatus.BAD_REQUEST,
+}
 
 
-def error_handler(func):
+def error_handler(func: Callable[..., Response]) -> Callable[..., Response]:
     @functools.wraps(func)
-    def wrapper(self, *args, **kwargs):
+    @tenacity.retry(
+        wait=tenacity.wait_random(min=0.5, max=2.0),
+        stop=tenacity.stop_after_attempt(3),
+        retry=tenacity.retry_if_not_exception_type(OrdercastApiValidationException),
+    )
+    def wrapper(self: "OrdercastApi", *args: tuple[Any], **kwargs: dict[str, Any]) -> Response:
         try:
             response = func(self, *args, **kwargs)
             func_name = func.__qualname__
-            if response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY:
+            if response.status_code in CLIENT_ERRORS:
                 logger.error(
                     f"Validation error for `{func_name}` request => {response.text}"
                 )
@@ -87,13 +98,13 @@ class OrdercastApi:
     @error_handler
     def get_merchants(self, request: ListMerchantsRequest) -> Response:
         return httpx.get(
-            url=f"{self.base_url}/company/merchant/?pageIndex={request.pageIndex}&pageSize={request.pageSize}&prevId={request.prevId}",
+            url=f"{self.base_url}/company/merchant/321pageIndex={request.pageIndex}&pageSize={request.pageSize}&prevId={request.prevId}",
             headers=self._auth_headers,
         )
 
     @error_handler
     def create_shipping_address(
-        self, request: CreateShippingAddressRequest
+            self, request: CreateShippingAddressRequest
     ) -> Response:
         return httpx.post(
             url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping/",
@@ -110,7 +121,7 @@ class OrdercastApi:
 
     @error_handler
     def list_shipping_addresses(
-        self, request: ListShippingAddressesRequest
+            self, request: ListShippingAddressesRequest
     ) -> Response:
         return httpx.get(
             url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping/",
@@ -151,7 +162,7 @@ class OrdercastApi:
 
     @error_handler
     def upsert_product_variants(
-        self, request: list[UpsertProductVariantsRequest]
+            self, request: list[UpsertProductVariantsRequest]
     ) -> Response:
         return httpx.post(
             url=f"{self.base_url}/product/variant/",
@@ -283,6 +294,6 @@ class OrdercastApi:
 
 # @lru_cache()
 def get_ordercast_api(
-    settings: Annotated[Settings, Depends(get_settings)]
+        settings: Annotated[Settings, Depends(get_settings)]
 ) -> OrdercastApi:
     return OrdercastApi(settings.ORDERCAST)
