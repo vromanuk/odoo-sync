@@ -37,6 +37,5 @@ class Settings(BaseSettings):
     REDIS: RedisConfig
 
 
-# @lru_cache()
 def get_settings() -> Settings:
     return Settings()
