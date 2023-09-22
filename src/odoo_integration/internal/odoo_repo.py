@@ -136,7 +136,6 @@ class OdooRepo:
         return self._client.length(f"{self._prefix}:{key}")
 
 
-# @lru_cache()
 def get_odoo_repo(
     redis_client: Annotated[RedisClient, Depends(get_redis_client)],
     settings: Annotated[Settings, Depends(get_settings)],

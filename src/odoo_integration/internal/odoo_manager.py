@@ -1169,7 +1169,6 @@ class OdooManager:
         )
 
 
-# @lru_cache()
 def get_odoo_provider(
     odoo_client: Annotated[OdooClient, Depends(get_odoo_client)],
     odoo_repo: Annotated[OdooRepo, Depends(get_odoo_repo)],

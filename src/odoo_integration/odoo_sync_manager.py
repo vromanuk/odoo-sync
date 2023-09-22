@@ -1,5 +1,4 @@
 from datetime import datetime
-from functools import lru_cache
 from typing import Any, Annotated, Optional
 
 import structlog
@@ -60,13 +59,14 @@ class OdooSyncManager:
         self.sync_orders_with_odoo(
             from_date=self.repo.get_key(RedisKeys.LAST_SUCCESSFUL_ORDERCAST_SYNC_DATE)
         )
+        logger.info("Start sync orders with Ordercast")
         self.sync_orders_with_ordercast(
             from_date=self.repo.get_key(RedisKeys.LAST_SUCCESSFUL_ODOO_SYNC_DATE)
         )
         # self.check_deletion()?
 
     def sync_users(self) -> None:
-        logger.info("Started syncing user's data with Ordercast.")
+        logger.info("Started syncing user's data with Ordercast")
         self.sync_users_from_odoo()
 
     def sync_users_from_odoo(self) -> None:
@@ -294,7 +294,6 @@ class OdooSyncManager:
             self.ordercast_manager.sync_orders(orders)
 
 
-@lru_cache()
 def get_odoo_sync_manager(
     odoo_repo: Annotated[OdooRepo, Depends(get_odoo_repo)],
     odoo_provider: Annotated[OdooManager, Depends(get_odoo_provider)],

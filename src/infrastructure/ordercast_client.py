@@ -294,7 +294,6 @@ class OrdercastApi:
         )
 
 
-# @lru_cache()
 def get_ordercast_api(
     settings: Annotated[Settings, Depends(get_settings)]
 ) -> OrdercastApi:

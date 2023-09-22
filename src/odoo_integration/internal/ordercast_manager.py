@@ -42,7 +42,7 @@ from src.infrastructure import (
     ListOrdersRequest,
 )
 from .constants import ORDER_STATUSES_FOR_SYNC
-from .odoo_repo import OdooRepo, RedisKeys
+from .odoo_repo import RedisKeys
 
 logger = structlog.getLogger(__name__)
 
@@ -173,21 +173,19 @@ class OrdercastManager:
     def get_attributes(self) -> list[OrdercastAttribute]:
         logger.info("Receiving attributes from Ordercast")
         response = self.ordercast_api.get_attributes()
-        result_json = response.json()
         return [
             OrdercastAttribute(id=attribute["id"], name=attribute["name"])
-            for attribute in result_json
+            for attribute in response.json()
         ]
 
     def get_categories(self) -> list[OrdercastCategory]:
         logger.info("Receiving categories from Ordercast")
         response = self.ordercast_api.get_categories()
-        result_json = response.json()
         return [
             OrdercastCategory(
                 id=category["id"], name=category["name"], code=category["code"]
             )
-            for category in result_json
+            for category in response.json()
         ]
 
     def get_default_price_rate(self) -> dict[str, Any]:
@@ -209,40 +207,6 @@ class OrdercastManager:
             ),
             None,
         )
-
-    def get_address(
-        self, address: dict[str, Any], odoo_repo: OdooRepo
-    ) -> dict[str, Any]:
-        if address:
-            address_dto = {
-                "id": address.id,
-                "name": address.name,
-                "address_one": address.address_one,
-                "postal_code": address.code,
-                "phone": address.phone,
-                "email": address.email,
-            }
-            if address.address_two:
-                address_dto["address_two"] = address.address_two
-            if address.city:
-                address_dto["city"] = address.city.name
-                if address.city.region:
-                    address_dto["region"] = address.city.region.name
-            if address.country:
-                address_dto["country"] = address.country.name
-            if address.copy_from:
-                address_id = address.copy_from.id
-            else:
-                address_id = address.id
-            # external_address = AddressExternal.objects.filter(
-            #     address_id=address_id
-            # ).first()
-            external_address = odoo_repo.get(
-                key=RedisKeys.ADDRESSES, entity_id=address_id
-            )
-            if external_address:
-                address_dto["_remote_id"] = external_address.odoo_id
-            return address_dto
 
     def save_products(self, products: list[dict[str, Any]]) -> None:
         default_catalog = self.get_catalog()
@@ -397,6 +361,40 @@ class OrdercastManager:
             )
             for order in result_json["items"]
         ]
+
+    def get_address(
+        self, address: dict[str, Any], odoo_repo: OdooRepo
+    ) -> dict[str, Any]:
+        if address:
+            address_dto = {
+                "id": address.id,
+                "name": address.name,
+                "address_one": address.address_one,
+                "postal_code": address.code,
+                "phone": address.phone,
+                "email": address.email,
+            }
+            if address.address_two:
+                address_dto["address_two"] = address.address_two
+            if address.city:
+                address_dto["city"] = address.city.name
+                if address.city.region:
+                    address_dto["region"] = address.city.region.name
+            if address.country:
+                address_dto["country"] = address.country.name
+            if address.copy_from:
+                address_id = address.copy_from.id
+            else:
+                address_id = address.id
+            # external_address = AddressExternal.objects.filter(
+            #     address_id=address_id
+            # ).first()
+            external_address = odoo_repo.get(
+                key=RedisKeys.ADDRESSES, entity_id=address_id
+            )
+            if external_address:
+                address_dto["_remote_id"] = external_address.odoo_id
+            return address_dto
 
     def get_orders_for_sync(
         self,
@@ -618,7 +616,6 @@ class OrdercastManager:
             raise exc
 
 
-# @lru_cache()
 def get_ordercast_manager(
     ordercast_api: Annotated[OrdercastApi, Depends(get_ordercast_api)]
 ) -> OrdercastManager:

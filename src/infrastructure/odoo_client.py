@@ -89,6 +89,5 @@ class OdooClient:
         return self._config.ODOO_DISCOUNTS
 
 
-# @lru_cache()
 def get_odoo_client(settings: Annotated[Settings, Depends(get_settings)]) -> OdooClient:
     return OdooClient(settings.ODOO)

@@ -64,7 +64,6 @@ class RedisClient:
         return self._client.scard(key)
 
 
-# @lru_cache()
 def get_redis_client(
     settings: Annotated[Settings, Depends(get_settings)]
 ) -> RedisClient:
