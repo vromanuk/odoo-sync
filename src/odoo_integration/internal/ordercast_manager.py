@@ -356,46 +356,7 @@ class OrdercastManager:
 
         logger.info(f"Received {len(result_json['items'])} orders to sync")
 
-        return [
-            OrdercastFlatOrder(
-                id=order["id"],
-                created_at=order["created_at"],
-                updated_at=order["updated_at"],
-            )
-            for order in result_json["items"]
-        ]
-
-    def get_address(self, address: dict[str, Any]) -> dict[str, Any]:
-        if address:
-            address_dto = {
-                "id": address.id,
-                "name": address.name,
-                "address_one": address.address_one,
-                "postal_code": address.code,
-                "phone": address.phone,
-                "email": address.email,
-            }
-            if address.address_two:
-                address_dto["address_two"] = address.address_two
-            if address.city:
-                address_dto["city"] = address.city.name
-                if address.city.region:
-                    address_dto["region"] = address.city.region.name
-            if address.country:
-                address_dto["country"] = address.country.name
-            if address.copy_from:
-                address_id = address.copy_from.id
-            else:
-                address_id = address.id
-            # external_address = AddressExternal.objects.filter(
-            #     address_id=address_id
-            # ).first()
-            external_address = odoo_repo.get(
-                key=RedisKeys.ADDRESSES, entity_id=address_id
-            )
-            if external_address:
-                address_dto["_remote_id"] = external_address.odoo_id
-            return address_dto
+        return [OrdercastFlatOrder(**order) for order in result_json["items"]]
 
     def get_orders_for_sync(
         self,
@@ -417,14 +378,16 @@ class OrdercastManager:
             order_dto = {
                 "id": order.id,
                 "name": f"OC{str(order.id).zfill(5)}",
-                "status": ordercast_order.status,
+                "status": order.status,
+                "_remote_id": order.external_id,
+                "user_remote_id": ordercast_order.merchant.external_id,
             }
-            if ordercast_order.shipping_address:
-                order_dto["shipping_address"] = ordercast_order.shipping_address
+            if order.shipping_address:
+                order_dto["shipping_address"] = order.shipping_address
             if ordercast_order.billing_address:
                 order_dto["billing_address"] = ordercast_order.billing_address
-            if ordercast_order.delivery_option:
-                delivery_option = ordercast_order.delivery_option
+            if order.delivery_method:
+                delivery_option = order.delivery_option
                 delivery_option_dto = {
                     "id": delivery_option.id,
                     "name": delivery_option.name,
@@ -436,8 +399,8 @@ class OrdercastManager:
                     delivery_option_dto["_remote_id"] = odoo_delivery_option.odoo_id
 
                 order_dto["delivery_option"] = delivery_option_dto
-            if ordercast_order.pickup_location:
-                warehouse = ordercast_order.pickup_location
+            if order.pickup_location:
+                warehouse = order.pickup_location
                 warehouse_dto = {"id": warehouse.id, "name": warehouse.name}
                 odoo_warehouse = odoo_repo.get(
                     key=RedisKeys.PICKUP_LOCATIONS, entity_id=warehouse.id
@@ -451,14 +414,6 @@ class OrdercastManager:
                     )
                 order_dto["warehouse"] = warehouse_dto
 
-            odoo_order = odoo_repo.get(key=RedisKeys.ORDERS, entity_id=order.id)
-            if odoo_order:
-                order_dto["_remote_id"] = odoo_order.odoo_id
-            odoo_user = odoo_repo.get(
-                key=RedisKeys.USERS, entity_id=ordercast_order.merchant.id
-            )
-            if odoo_user:
-                order_dto["user_remote_id"] = odoo_user.odoo_id
             if ordercast_order.invoice:
                 order_dto["invoice_number"] = ordercast_order.invoice.get(
                     "invoice_number", 0
@@ -487,7 +442,7 @@ class OrdercastManager:
                 elif existing_order.invoice:
                     logger.info(
                         f"""
-                        Invoice file {existing_order.invoice.url.split('/')[-1] 
+                        Invoice file {existing_order.invoice.url.split('/')[-1]
                         if existing_order.invoice and existing_order.invoice.url else ''} 
                         removed from order {existing_order.id}.
                         """

@@ -25,12 +25,6 @@ class OrdercastCategory(OrdercastCommon):
     code: str
 
 
-class OrdercastFlatOrder(BaseModel):
-    id: PositiveInt
-    created_at: datetime
-    updated_at: datetime
-
-
 class OrdercastUser(BaseModel):
     email: EmailStr
     first_name: str
@@ -59,22 +53,22 @@ class OrdercastMerchantStatus(BaseModel):
 
 class OrdercastMerchant(BaseModel):
     erp_id: str
-    external_id: str
-    info: str
-    name: str
-    phone: str
+    external_id: str = ""
+    info: str = ""
+    name: str = ""
+    phone: str = ""
     sector_id: PositiveInt
-    vat: str
-    website: str
+    vat: str = ""
+    website: str = ""
     id: PositiveInt
     created_at: datetime
     price_rate_id: int
-    note: str
+    note: str = ""
     is_payment_required: bool
     corporate_status_name: str
-    prices_pdf: dict[str, Any]
-    price_rate: dict[str, Any]
-    catalogs: list[OrdercastMerchantCatalog]
+    prices_pdf: Optional[dict[str, Any]] = None
+    price_rate: Optional[dict[str, Any]] = None
+    catalogs: list[OrdercastMerchantCatalog] = []
     status: OrdercastMerchantStatus
 
 
@@ -154,33 +148,43 @@ class OrdercastBillingAddress(BaseModel):
     vat: str
 
 
+class OrdercastFlatOrder(BaseModel):
+    id: PositiveInt
+    created_at: datetime
+    created_by: OrdercastUser
+    external_id: str
+    status: OrdercastOrderStatus
+    delivery_method: Optional[OrdercastDeliveryMethod] = None
+    shipping_address: Optional[OrdercastShippingAddress] = None
+    pickup_location: Optional[OrdercastPickupLocation] = None
+
+
 class OrdercastOrder(BaseModel):
     id: PositiveInt
     created_at: datetime
     ordered_at: datetime
-    completed_at: datetime
-    deadline: int
     external_id: str
     internal_id: int
-    invoice: dict[str, Any]
-    unit_labels: dict[str, Any]
     note: str
     total_price_gross: int
     total_price_net: int
     tracking_codes: list[str]
     updated_at: datetime
-    company_note: str
-    images_zip: dict[str, Any]
     is_editable: bool
     is_same_address: bool
     lines_amount: int
     taxes: int
     created_by: OrdercastUser
-    delivery_method: OrdercastDeliveryMethod
     merchant: OrdercastMerchant
-    shipping_address: OrdercastShippingAddress
     status: OrdercastOrderStatus
     payments: list[OrdercastPayment]
-    pickup_location: OrdercastPickupLocation
     price_rate: dict[str, Any]
-    billing_address: OrdercastBillingAddress
+    company_note: str = ""
+    invoice: Optional[dict[str, Any]] = None
+    unit_labels: Optional[dict[str, Any]] = None
+    completed_at: Optional[datetime] = None
+    deadline: Optional[int] = None
+    delivery_method: Optional[OrdercastDeliveryMethod] = None
+    shipping_address: Optional[OrdercastShippingAddress] = None
+    pickup_location: Optional[OrdercastPickupLocation] = None
+    billing_address: Optional[OrdercastBillingAddress] = None
