@@ -9,12 +9,13 @@ from src.data import (
     InvoiceStatus,
     OrderStatus,
     Locale,
-    OrdercastMerchant,
+    OrdercastFlatMerchant,
     OrdercastProduct,
     OrdercastAttribute,
     OrdercastCategory,
-    OrdercastOrder,
+    OrdercastFlatOrder,
     OrdercastOrderStatus,
+    OrdercastOrder,
 )
 from src.infrastructure import (
     OrdercastApi,
@@ -42,7 +43,7 @@ from src.infrastructure import (
     ListOrdersRequest,
 )
 from .constants import ORDER_STATUSES_FOR_SYNC
-from .odoo_repo import RedisKeys
+from .odoo_repo import RedisKeys, OdooRepo
 
 logger = structlog.getLogger(__name__)
 
@@ -51,12 +52,14 @@ class OrdercastManager:
     def __init__(self, ordercast_api: OrdercastApi) -> None:
         self.ordercast_api = ordercast_api
 
-    def get_users(self) -> list[OrdercastMerchant]:
+    def get_users(self) -> list[OrdercastFlatMerchant]:
         # TODO: handle pagination
         response = self.ordercast_api.get_merchants(request=ListMerchantsRequest())
         users = response.json()["items"]
         return [
-            OrdercastMerchant(id=user["id"], name=user["name"], erp_id=user["erp_id"])
+            OrdercastFlatMerchant(
+                id=user["id"], name=user["name"], erp_id=user["erp_id"]
+            )
             for user in users
         ]
 
@@ -336,7 +339,7 @@ class OrdercastManager:
         statuses: list[OrdercastOrderStatus],
         order_ids: Optional[list[int]] = None,
         from_date: Optional[datetime] = None,
-    ) -> list[OrdercastOrder]:
+    ) -> list[OrdercastFlatOrder]:
         status_ids = [
             status.id for status in statuses if status.enum in ORDER_STATUSES_FOR_SYNC
         ]
@@ -354,7 +357,7 @@ class OrdercastManager:
         logger.info(f"Received {len(result_json['items'])} orders to sync")
 
         return [
-            OrdercastOrder(
+            OrdercastFlatOrder(
                 id=order["id"],
                 created_at=order["created_at"],
                 updated_at=order["updated_at"],
@@ -396,6 +399,7 @@ class OrdercastManager:
 
     def get_orders_for_sync(
         self,
+        odoo_repo: OdooRepo,
         order_ids: Optional[list[int]] = None,
         from_date: Optional[datetime] = None,
     ) -> list[dict[str, Any]]:
@@ -407,24 +411,20 @@ class OrdercastManager:
 
         result = []
         for order in orders_to_sync:
-            self.ordercast_api.get_order(order.id)
+            ordercast_order = OrdercastOrder(
+                **self.ordercast_api.get_order(order.id).json()
+            )
             order_dto = {
                 "id": order.id,
                 "name": f"OC{str(order.id).zfill(5)}",
-                "status": order.status,
+                "status": ordercast_order.status,
             }
-            billing_address_dto = self.get_address(
-                order.billing_info.address, odoo_repo=odoo_repo
-            )
-            shipping_address_dto = self.get_address(order.address, odoo_repo=odoo_repo)
-            if shipping_address_dto:
-                order_dto["shipping_address"] = shipping_address_dto
-            if billing_address_dto:
-                billing_address_dto["name"] = order.billing_info.enterprise_name
-                billing_address_dto["vat"] = order.billing_info.vat
-                order_dto["billing_address"] = billing_address_dto
-            if order.delivery_option:
-                delivery_option = order.delivery_option
+            if ordercast_order.shipping_address:
+                order_dto["shipping_address"] = ordercast_order.shipping_address
+            if ordercast_order.billing_address:
+                order_dto["billing_address"] = ordercast_order.billing_address
+            if ordercast_order.delivery_option:
+                delivery_option = ordercast_order.delivery_option
                 delivery_option_dto = {
                     "id": delivery_option.id,
                     "name": delivery_option.name,
@@ -436,8 +436,8 @@ class OrdercastManager:
                     delivery_option_dto["_remote_id"] = odoo_delivery_option.odoo_id
 
                 order_dto["delivery_option"] = delivery_option_dto
-            if order.warehouse:
-                warehouse = order.warehouse
+            if ordercast_order.pickup_location:
+                warehouse = ordercast_order.pickup_location
                 warehouse_dto = {"id": warehouse.id, "name": warehouse.name}
                 odoo_warehouse = odoo_repo.get(
                     key=RedisKeys.PICKUP_LOCATIONS, entity_id=warehouse.id
@@ -453,60 +453,18 @@ class OrdercastManager:
             odoo_order = odoo_repo.get(key=RedisKeys.ORDERS, entity_id=order.id)
             if odoo_order:
                 order_dto["_remote_id"] = odoo_order.odoo_id
-            odoo_user = odoo_repo.get(key=RedisKeys.USERS, entity_id=order.user)
+            odoo_user = odoo_repo.get(
+                key=RedisKeys.USERS, entity_id=ordercast_order.merchant.id
+            )
             if odoo_user:
                 order_dto["user_remote_id"] = odoo_user.odoo_id
-            if order.invoice_number:
-                order_dto["invoice_number"] = order.invoice_number
-            if order.note:
-                order_dto["note"] = order.note
-            if order.basket:
-                basket = order.basket
-                basket_dto = {
-                    "id": basket.id,
-                    "total": basket.total,
-                    "grand_total": basket.grand_total,
-                    "total_taxes": basket.total_taxes,
-                    "vat_percent": basket.vat_percent,
-                }
-                order_dto["basket"] = basket_dto
-                if basket.basket_products:
-                    basket_products = []
-                    basket_dto["basket_products"] = basket_products
-                    for basket_product in basket.basket_products.all():
-                        basket_product_dto = {
-                            "id": basket_product.id,
-                            "price": basket_product.price,
-                            "quantity": basket_product.quantity,
-                            "total_price": basket_product.total,
-                            "total_quantity": basket_product.total_quantity,
-                        }
-                        if basket_product.final_quantity:
-                            basket_product_dto[
-                                "final_quantity"
-                            ] = basket_product.final_quantity
+            if ordercast_order.invoice:
+                order_dto["invoice_number"] = ordercast_order.invoice.get(
+                    "invoice_number", 0
+                )
+            if ordercast_order.note:
+                order_dto["note"] = ordercast_order.note
 
-                        if basket_product.product:
-                            product = basket_product.product
-                            product_dto = {
-                                "id": product.id,
-                                "ref": product.ref,
-                                "name": product.name,
-                            }
-                            odoo_product = odoo_repo.get(
-                                key=RedisKeys.PRODUCT_VARIANTS, entity_id=product.id
-                            )
-                            if odoo_product:
-                                product_dto["_remote_id"] = odoo_product.odoo_id
-                            basket_product_dto["product"] = product_dto
-                        odoo_basket_product = odoo_repo.get(
-                            key=RedisKeys.BASKET_PRODUCT, entity_id=basket_product.id
-                        )
-                        if odoo_basket_product:
-                            basket_product_dto[
-                                "_remote_id"
-                            ] = odoo_basket_product.odoo_id
-                        basket_products.append(basket_product_dto)
             result.append(order_dto)
 
         return result
@@ -517,8 +475,6 @@ class OrdercastManager:
             if odoo_order:
                 odoo_order.odoo_order_status = order["status"]
                 odoo_order.odoo_invoice_status = order["invoice_status"]
-
-                # todo: add logic of updating products amount, out of stock it should be investigated.
 
                 existing_order = odoo_order.order
                 if "invoice_file_data" in order:

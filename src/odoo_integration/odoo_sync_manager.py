@@ -280,7 +280,7 @@ class OdooSyncManager:
         from_date: Optional[datetime] = None,
     ) -> None:
         orders = self.ordercast_manager.get_orders_for_sync(
-            order_ids=order_ids, from_date=from_date
+            odoo_repo=self.repo, order_ids=order_ids, from_date=from_date
         )
         logger.info(f"Loaded {len(orders)} orders, start sending them to Odoo.")
         self.odoo_manager.sync_orders(orders)

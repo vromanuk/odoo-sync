@@ -2,7 +2,7 @@ from typing import Any, Optional
 
 import structlog
 
-from src.data import OrdercastMerchant
+from src.data import OrdercastFlatMerchant
 from src.infrastructure import OdooClient
 from .exceptions import OdooSyncException
 from .helpers import is_not_empty, is_empty, is_unique_by, is_length_not_in_range
@@ -60,7 +60,7 @@ class Partner:
 
 
 def validate_partners(
-    partners: list[dict[str, Any]], ordercast_users: list[OrdercastMerchant]
+    partners: list[dict[str, Any]], ordercast_users: list[OrdercastFlatMerchant]
 ) -> None:
     if not partners:
         return

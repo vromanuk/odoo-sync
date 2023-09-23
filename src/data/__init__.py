@@ -13,7 +13,6 @@ from .models import (
     OdooProductVariant,
     OdooProduct,
     OdooAttribute,
-    OdooProductVariant,
     OdooDeliveryOption,
     OdooPickupLocation,
     OdooOrder,
@@ -23,12 +22,13 @@ from .models import (
     OdooPriceRate,
 )
 from .ordercast_models import (
-    OrdercastMerchant,
+    OrdercastFlatMerchant,
     OrdercastProduct,
     OrdercastAttribute,
     OrdercastCategory,
-    OrdercastOrder,
+    OrdercastFlatOrder,
     OrdercastOrderStatus,
+    OrdercastOrder,
 )
 from .typings import OdooEntity
 
@@ -50,14 +50,15 @@ __all__ = (
     "OrderStatus",
     "InvoiceStatus",
     "Locale",
-    "OrdercastMerchant",
+    "OrdercastFlatMerchant",
     "OrdercastProduct",
     "OdooCategory",
     "CategoryType",
     "OrdercastAttribute",
     "OrdercastCategory",
     "OdooPriceRate",
-    "OrdercastOrder",
+    "OrdercastFlatOrder",
     "OrderStatusForSync",
     "OrdercastOrderStatus",
+    "OrdercastOrder",
 )

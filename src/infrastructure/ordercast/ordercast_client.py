@@ -289,7 +289,7 @@ class OrdercastApi:
     @error_handler
     def get_order(self, order_id: int) -> Response:
         return httpx.get(
-            url=f"{self.base_url}/order/{order_id}/",
+            url=f"{self.base_url}/order/{order_id}",
             headers=self._auth_headers,
         )
 
