@@ -39,14 +39,3 @@ async def sync(
 ) -> Response:
     odoo_sync_manager.sync()
     return Response(message="Started full sync")
-
-
-# @router.get(
-#     "/orders",
-#     summary="Start syncing with Odoo, orders only.",
-#     response_description="Returns 200 if sync with Odoo started",
-#     tags=["health"],
-# )
-# async def orders_sync(syncer: Depends(get_odoo_sync_manager), background_tasks: BackgroundTasks) -> dict[str, str]:
-#     background_tasks.add_task(syncer.sync_orders)
-#     return {"msg": "Order sync started"}

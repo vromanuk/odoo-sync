@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Any
 
 from pydantic import BaseModel, PositiveInt, EmailStr
 
@@ -12,6 +12,10 @@ class OdooCommons(BaseModel):
     created_at: datetime = datetime.now(timezone.utc)
     updated_at: datetime = datetime.now(timezone.utc)
     sync_date: Optional[datetime] = None
+
+    @classmethod
+    def from_json(cls, user_json: str) -> Any:
+        return cls(**json.loads(user_json))
 
 
 class OdooProduct(OdooCommons):
@@ -51,10 +55,6 @@ class OdooUser(OdooCommons):
     contact_phone: str
     user: Optional[PositiveInt] = None
 
-    @classmethod
-    def from_json(cls, user_json: str) -> "OdooUser":
-        return cls(**json.loads(user_json))
-
 
 class OdooDeliveryOption(OdooCommons):
     name: str
@@ -69,10 +69,6 @@ class OdooPickupLocation(OdooCommons):
 class OdooAddress(OdooCommons):
     address: PositiveInt
     original_address_id: PositiveInt
-
-    @classmethod
-    def from_json(cls, user_json: str) -> "OdooAddress":
-        return cls(**json.loads(user_json))
 
 
 class OdooBasketProduct(OdooCommons):

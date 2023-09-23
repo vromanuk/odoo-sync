@@ -133,7 +133,9 @@ class OdooRepo:
         return self._client.get(f"{self._prefix}:{key}")
 
     def get_len(self, key: RedisKeys) -> int:
-        return self._client.length(f"{self._prefix}:{key}")
+        entity_schema = self._schema[key]
+        entity_key = entity_schema["key"]
+        return self._client.length(entity_key)
 
 
 def get_odoo_repo(

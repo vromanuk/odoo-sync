@@ -18,7 +18,7 @@ class OdooClient:
             protocol=self._config.ODOO_PROTOCOL,
         )
 
-    def get_objects(
+    def get_odoo_entities(
         self, object_name: str, criteria: Any = None, i18n_fields: Any = None
     ) -> Any:
         if criteria is None:
@@ -53,7 +53,8 @@ class OdooClient:
                                 break
         return list_data
 
-    def get_object(self, obj: Any) -> dict[str, Any]:
+    @staticmethod
+    def get_odoo_entity(obj: Any) -> dict[str, Any]:
         if (
             isinstance(obj, list) and len(obj) > 1
         ):  # clear [int, str] mixed lists, leave only fist type
@@ -70,13 +71,13 @@ class OdooClient:
 
         return obj
 
-    def get_object_id(self, obj: str) -> Any:
-        odoo_object = self.get_object(obj)
+    def get_odoo_entity_id(self, obj: str) -> Any:
+        odoo_object = self.get_odoo_entity(obj)
         if isinstance(odoo_object, list) and len(odoo_object) > 0:
             return odoo_object[0]
         return odoo_object
 
-    def get_all_object_ids(self, object_name: str, domain: Any = None) -> list[int]:
+    def get_odoo_entity_ids(self, object_name: str, domain: Any = None) -> list[int]:
         if not domain:
             domain = []
         remote_results = self._client[object_name].search_read(

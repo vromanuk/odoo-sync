@@ -300,7 +300,10 @@ class OdooSyncManager:
         self.odoo_manager.sync_orders(orders)
 
     def sync_orders_with_ordercast(self, from_date: Optional[datetime] = None) -> None:
-        orders = self.odoo_manager.receive_orders(from_date=from_date)
+        orders = self.odoo_manager.receive_orders(
+            from_date=from_date,
+            orders_invoice_attach_pending=self.odoo_manager.get_orders_invoice_attach_pending(),
+        )
         logger.info(
             f"Received {len(orders) if orders else 0} orders, start saving them."
         )

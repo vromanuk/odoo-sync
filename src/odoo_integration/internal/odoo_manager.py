@@ -20,6 +20,7 @@ from src.data import (
     OdooProductVariant,
     OdooDeliveryOption,
     OdooPickupLocation,
+    InvoiceStatus,
 )
 from src.infrastructure import OdooClient, get_odoo_client
 from .exceptions import OdooSyncException
@@ -121,8 +122,10 @@ class OdooManager:
                     ]
                 )
 
-        partners = self._client.get_objects("res.partner", criteria=api_filter_criteria)
-        remote_supported_langs = self._client.get_objects("res.lang")
+        partners = self._client.get_odoo_entities(
+            "res.partner", criteria=api_filter_criteria
+        )
+        remote_supported_langs = self._client.get_odoo_entities("res.lang")
 
         return [
             Partner.build_from(
@@ -135,7 +138,7 @@ class OdooManager:
 
     def sync_users(self, users: list[dict[str, Any]]) -> None:
         remote_users_obj = self._client["res.partner"]
-        remote_supported_langs = self._client.get_objects("res.lang")
+        remote_supported_langs = self._client.get_odoo_entities("res.lang")
         for user in users:
             copy_user = user.copy()
 
@@ -418,7 +421,7 @@ class OdooManager:
             result.append(group_dto)
 
         return {
-            "all_ids": self._client.get_all_object_ids(
+            "all_ids": self._client.get_odoo_entity_ids(
                 "product.template",
                 [("is_published", "=", True), ("list_price", ">", 0.0)],
             ),
@@ -428,28 +431,13 @@ class OdooManager:
     def get_remote_updated_objects(
         self,
         remote_object_name: str,
-        object_external: Any = None,
-        from_date: Optional[datetime] = None,
-        sync_from_last_time: Optional[datetime] = False,
         i18n_fields: list[str] = None,
         filter_criteria: Any = None,
+        remote_ids: Optional[list] = None,
     ) -> Any:
         api_filter_criteria = []
         if filter_criteria and isinstance(filter_criteria, list):
             api_filter_criteria.extend(filter_criteria)
-
-        if sync_from_last_time and object_external:
-            from_date = object_external.objects.order_by("sync_date").last().sync_date
-
-        if from_date:
-            last_sync_date_str = from_date.strftime("%Y-%m-%d %H:%M:%S")
-            api_filter_criteria.append(("write_date", ">=", last_sync_date_str))
-
-        remote_ids = None
-        if object_external:
-            remote_ids = [
-                external.odoo_id for external in object_external.objects.all()
-            ]
 
         if remote_ids:
             items_limit = 100
@@ -459,7 +447,7 @@ class OdooManager:
                     local_api_filter_criteria = [
                         ("id", "in", remote_ids[id_range : id_range + items_limit])
                     ]
-                    objects_parts += self._client.get_objects(
+                    objects_parts += self._client.get_odoo_entities(
                         remote_object_name,
                         api_filter_criteria + local_api_filter_criteria,
                         i18n_fields=i18n_fields,
@@ -467,11 +455,11 @@ class OdooManager:
                 remote_objects = objects_parts
             else:
                 api_filter_criteria.append(("id", "in", remote_ids))
-                remote_objects = self._client.get_objects(
+                remote_objects = self._client.get_odoo_entities(
                     remote_object_name, api_filter_criteria, i18n_fields=i18n_fields
                 )
         else:
-            remote_objects = self._client.get_objects(
+            remote_objects = self._client.get_odoo_entities(
                 remote_object_name, api_filter_criteria, i18n_fields=i18n_fields
             )
         return remote_objects
@@ -496,7 +484,7 @@ class OdooManager:
                 for attribute in product_template_attributes:
                     if "id" in attribute and attribute["id"] in attribute_ids:
                         result_ids.extend(
-                            self._client.get_object(
+                            self._client.get_odoo_entity(
                                 attribute["product_attribute_value_id"]
                             )
                         )
@@ -580,34 +568,34 @@ class OdooManager:
                 product_variant["public_categ_ids"]
                 and len(product_variant["public_categ_ids"]) > 0
             ):
-                product_variant_dto["category"] = self._client.get_object(
+                product_variant_dto["category"] = self._client.get_odoo_entity(
                     product_variant["public_categ_ids"]
                 )
             if (
                 product_variant["product_tmpl_id"]
                 and len(product_variant["product_tmpl_id"]) > 0
             ):
-                product_variant_dto["group"] = self._client.get_object(
+                product_variant_dto["group"] = self._client.get_odoo_entity(
                     product_variant["product_tmpl_id"]
                 )
             if (
                 product_variant["product_variant_ids"]
                 and len(product_variant["product_variant_ids"]) > 0
             ):
-                product_variant_dto["product_variant"] = self._client.get_object(
+                product_variant_dto["product_variant"] = self._client.get_odoo_entity(
                     product_variant["product_variant_ids"]
                 )
             if (
                 product_variant["attribute_line_ids"]
                 and len(product_variant["attribute_line_ids"]) > 0
             ):
-                product_variant_dto["attr_dynamic"] = self._client.get_object(
+                product_variant_dto["attr_dynamic"] = self._client.get_odoo_entity(
                     product_variant["attribute_line_ids"]
                 )
             product_variant_dto["names"] = product_variants_names[product_variant["id"]]
             result.append(product_variant_dto)
         return {
-            "all_ids": self._client.get_all_object_ids(
+            "all_ids": self._client.get_odoo_entity_ids(
                 "product.product",
                 [("is_published", "=", True), ("list_price", ">", 0.0)],
             ),
@@ -633,13 +621,13 @@ class OdooManager:
                 "_remote_id": category["id"],
                 "name": category["name"],
                 **get_i18n_field_as_dict(category, "name"),
-                "parent": self._client.get_object(category["parent_id"])[0]
+                "parent": self._client.get_odoo_entity(category["parent_id"])[0]
                 if category["parent_id"]
                 else None,
-                "groups": self._client.get_object(category["product_tmpl_ids"])
+                "groups": self._client.get_odoo_entity(category["product_tmpl_ids"])
                 if category["product_tmpl_ids"]
                 else None,
-                "child": self._client.get_object(category["child_id"])
+                "child": self._client.get_odoo_entity(category["child_id"])
                 if category["child_id"]
                 else None,
                 "parent_code": parent_codes[category["parent_id"][0]]
@@ -651,7 +639,7 @@ class OdooManager:
         ]
 
         return {
-            "all_ids": self._client.get_all_object_ids("product.public.category"),
+            "all_ids": self._client.get_odoo_entity_ids("product.public.category"),
             "objects": result,
         }
 
@@ -678,7 +666,7 @@ class OdooManager:
                 attribute_dto.update(get_i18n_field_as_dict(attribute, "name"))
 
                 if attribute["product_tmpl_ids"]:
-                    attribute_dto["groups"] = self._client.get_object(
+                    attribute_dto["groups"] = self._client.get_odoo_entity(
                         attribute["product_tmpl_ids"]
                     )
 
@@ -709,10 +697,10 @@ class OdooManager:
                     print(f"There is no attribute for value {attribute_value}")
 
         return {
-            "all_ids": self._client.get_all_object_ids("product.attribute"),
+            "all_ids": self._client.get_odoo_entity_ids("product.attribute"),
             "objects": result,
             "attribute_values": {
-                "all_ids": self._client.get_all_object_ids("product.attribute.value"),
+                "all_ids": self._client.get_odoo_entity_ids("product.attribute.value"),
                 "objects": None,
             },
         }
@@ -732,7 +720,7 @@ class OdooManager:
         ]
 
     def receive_delivery_options(self) -> dict[str, Any]:
-        delivery_options = self._client.get_objects(
+        delivery_options = self._client.get_odoo_entities(
             "delivery.carrier", i18n_fields=["name"]
         )
         delivery_options_names = get_entity_name_as_i18n(delivery_options)
@@ -750,7 +738,7 @@ class OdooManager:
             delivery_option_dto.update(i18n_fields)
             result.append(delivery_option_dto)
         return {
-            "all_ids": self._client.get_all_object_ids(
+            "all_ids": self._client.get_odoo_entity_ids(
                 "delivery.carrier", [("is_published", "=", True)]
             ),
             "objects": result,
@@ -758,7 +746,9 @@ class OdooManager:
 
     def receive_pickup_locations(self, partners: list[OdooUser]) -> dict[str, Any]:
         partner_mapper = {p.id: p for p in partners}
-        warehouses = self._client.get_objects("stock.warehouse", i18n_fields=["name"])
+        warehouses = self._client.get_odoo_entities(
+            "stock.warehouse", i18n_fields=["name"]
+        )
         warehouses_names = get_entity_name_as_i18n(warehouses)
         result = []
         for warehouse in warehouses:
@@ -771,7 +761,7 @@ class OdooManager:
             }
             result.append(warehouse_dto)
         return {
-            "all_ids": self._client.get_all_object_ids("stock.warehouse"),
+            "all_ids": self._client.get_odoo_entity_ids("stock.warehouse"),
             "objects": result,
         }
 
@@ -949,24 +939,20 @@ class OdooManager:
                         )
 
     def receive_orders(
-        self, from_date: Optional[datetime] = None
+        self,
+        orders_invoice_attach_pending: list[int],
+        from_date: Optional[datetime] = None,
     ) -> list[dict[str, Any]]:
         if not self.repo.get_len(RedisKeys.ORDERS):
             logger.info(
-                "There are no order were send to Odoo, seems no orders created yet.",
-                "INFO",
+                "There are no order were send to Odoo" "seems no orders created yet."
             )
             return []
 
-        orders = self.get_remote_updated_objects("sale.order", OdooOrder, from_date)
+        orders = self.get_remote_updated_objects("sale.order")
 
-        # TODO: Fix
-        # orders_invoice_attach_pending = OrderExternal.objects.filter(odoo_order_status__exact=OrderExternal.SALE_STATUS,
-        #                                                              odoo_invoice_status__exact=OrderExternal.INV_INVOICED_STATUS).exclude(
-        #     order__status__in=[Order.PROCESSED_STATUS, Order.PENDING_PAYMENT_STATUS]).values_list('odoo_id', flat=True)
-        orders_invoice_attach_pending = []
         if orders_invoice_attach_pending:
-            status_check_orders = self._client.get_objects(
+            status_check_orders = self._client.get_odoo_entities(
                 "sale.order", [("id", "in", [i for i in orders_invoice_attach_pending])]
             )
             if status_check_orders:
@@ -985,14 +971,14 @@ class OdooManager:
                 "id": order["id"],
                 "_remote_id": order["id"],
                 "name": order["reference"],
-                "user_id": self._client.get_object_id(order["partner_id"]),
+                "user_id": self._client.get_odoo_entity_id(order["partner_id"]),
                 "status": order["state"],
                 "invoice_status": order["invoice_status"],
-                "partner_id": self._client.get_object_id(order["partner_id"]),
-                "billing_address": self._client.get_object_id(
+                "partner_id": self._client.get_odoo_entity_id(order["partner_id"]),
+                "billing_address": self._client.get_odoo_entity_id(
                     order["partner_invoice_id"]
                 ),
-                "shipping_address": self._client.get_object_id(
+                "shipping_address": self._client.get_odoo_entity_id(
                     order["partner_shipping_id"]
                 ),
                 "total_taxes": order["amount_tax"],
@@ -1036,30 +1022,28 @@ class OdooManager:
                                 order_dto["invoice_file_data"] = invoice_file_data
                                 order_dto["invoice_file_name"] = invoice_file_name
 
-            # order_dto["delivery_option"] = order_dto["carrier_id"]
             if "warehouse_id" in order:
-                order_dto["warehouse"] = self._client.get_object_id(
+                order_dto["warehouse"] = self._client.get_odoo_entity_id(
                     order["warehouse_id"]
                 )
-            # order_dto["basket"] = order_dto["amount_untaxed"]
 
             order_lines = remote_orders_line_obj.search_read(
                 [("order_id", "=", order["id"])]
             )
-            # default type
-            # billing_address_dto['type'] = 'contact'
-            # shipping_address_dto['type'] = 'contact'
+
             order_line_dtos = []
             if order_lines:
                 for order_line in order_lines:
                     order_line_dto = {
-                        "order_id": self._client.get_object_id(order_line["order_id"]),
+                        "order_id": self._client.get_odoo_entity_id(
+                            order_line["order_id"]
+                        ),
                         "price": order_line["price_unit"],
                         "quantity": order_line["product_uom_qty"],
                         "total_price": order_line["price_total"],
                     }
                     if "product_id" in order_line:
-                        product_id = self._client.get_object_id(
+                        product_id = self._client.get_odoo_entity_id(
                             order_line["product_id"]
                         )
                         if product_id:
@@ -1082,9 +1066,9 @@ class OdooManager:
                             logger.warn(
                                 f"""
                                 "Order '{order_dto['name']}' has item 
-                                '{(order_line['display_type'] + '/' 
-                                if 'display_type' in order_line else '') + 
-                                (order_line['name'] if 'name' in order_line else '')}' 
+                                '{(order_line['display_type'] + '/'
+                                                                                                                                  if 'display_type' in order_line else '') +
+                                  (order_line['name'] if 'name' in order_line else '')}' 
                                 which is ignored.
                                 """
                             )
@@ -1185,6 +1169,16 @@ class OdooManager:
                 for pickup_location in pickup_locations_to_sync
             ],
         )
+
+    def get_orders_invoice_attach_pending(self) -> list[int]:
+        return [
+            order.odoo_id
+            for order in self.repo.get_list(RedisKeys.ORDERS)
+            if order.odoo_order_status == OrderStatus.SALE_STATUS
+            and order.odoo_invoice_status == InvoiceStatus.INV_INVOICED_STATUS
+            and order.odoo_order_status
+            not in [OrderStatus.PROCESSED_STATUS, OrderStatus.PENDING_PAYMENT_STATUS]
+        ]
 
 
 def get_odoo_provider(

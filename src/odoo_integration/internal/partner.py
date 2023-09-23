@@ -46,7 +46,9 @@ class Partner:
         if is_not_empty(partner, "type"):
             partner_dto["type"] = partner["type"]
         if is_not_empty(partner, "parent_id"):
-            partner_dto["parent_id"] = odoo_client.get_object_id(partner["parent_id"])
+            partner_dto["parent_id"] = odoo_client.get_odoo_entity_id(
+                partner["parent_id"]
+            )
         if is_not_empty(partner, "country_code"):
             partner_dto["country_code"] = partner["country_code"]
         if is_not_empty(partner, "state_id"):
