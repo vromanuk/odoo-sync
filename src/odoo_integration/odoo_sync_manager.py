@@ -51,7 +51,8 @@ class OdooSyncManager:
         self.sync_products(full_sync=True)
 
         logger.info(
-            "Start receiving order data from Odoo => delivery methods & pickup locations"
+            "Start receiving order data from Odoo => "
+            "delivery methods & pickup locations"
         )
         self.sync_delivery_methods_and_pickup_locations()
 
@@ -109,7 +110,10 @@ class OdooSyncManager:
     def sync_categories_to_ordercast(self) -> dict[str, Any]:
         categories = self.odoo_manager.get_categories()
         logger.info(
-            f"Received {len(categories['objects']) if categories['objects'] else 0} categories, start saving them."
+            f"""
+            Received {len(categories['objects']) if categories['objects'] else 0} 
+            categories, start saving them.
+            """
         )
         if categories:
             validate_categories(categories)
@@ -122,7 +126,12 @@ class OdooSyncManager:
         attributes = self.odoo_manager.get_product_attributes()
 
         logger.info(
-            f"Received {len(attributes['objects']) if attributes['objects'] else 0} attributes with total of {sum([len(a['values']) for a in attributes['objects'] if 'values' in a])} values, start saving them."
+            f"""
+            Received {len(attributes['objects']) if attributes['objects'] else 0} 
+            attributes with total of 
+            {sum([len(a['values']) for a in attributes['objects'] if 'values' in a])} 
+            values, start saving them.
+            """
         )
 
         if attributes:
@@ -151,7 +160,8 @@ class OdooSyncManager:
 
         logger.info("Connected to Odoo")
         logger.info(
-            f"Received {len(products['objects']) if has_objects(products) else 0} products, start saving them."
+            f"Received {len(products['objects']) if has_objects(products) else 0} "
+            f"products, start saving them."
         )
 
         if has_objects(products):
@@ -188,13 +198,15 @@ class OdooSyncManager:
         has_product_variants = has_objects(product_variants)
 
         logger.info(
-            f"Received {len(product_variants['objects']) if has_product_variants else 0} products variants."
+            f"Received {len(product_variants['objects']) if has_product_variants else 0}"
+            f"products variants."
         )
 
         if has_product_variants:
             validate_product_variants(product_variants["objects"])
             logger.info(
-                "Starting saving product variants after saving categories and attributes."
+                "Starting saving product variants after"
+                "saving categories and attributes."
             )
             default_price_rate = self.repo.get_key(RedisKeys.DEFAULT_PRICE_RATE)
 
@@ -231,7 +243,8 @@ class OdooSyncManager:
     def sync_delivery_methods_and_pickup_locations(self) -> None:
         delivery_options = self.odoo_manager.receive_delivery_options()
         logger.info(
-            f"Received {len(delivery_options['objects']) if delivery_options and 'objects' in delivery_options else 0} delivery options, start saving them."
+            f"Received {len(delivery_options['objects']) if has_objects(delivery_options) else 0}"
+            f"delivery options, start saving them."
         )
         if delivery_options:
             validate_delivery_options(delivery_options)
@@ -261,7 +274,8 @@ class OdooSyncManager:
             partners=self.repo.get_list(RedisKeys.USERS)
         )
         logger.info(
-            f"Received {len(pickup_locations['objects']) if pickup_locations and 'objects' in pickup_locations else 0} warehouses, start saving them."
+            f"Received {len(pickup_locations['objects']) if has_objects(pickup_locations) else 0}"
+            f"warehouses, start saving them."
         )
         if pickup_locations:
             validate_pickup_locations(pickup_locations)

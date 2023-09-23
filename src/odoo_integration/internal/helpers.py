@@ -126,7 +126,8 @@ def get_entity_name_as_i18n(
     entities: list[dict[str, Any]], prefix: str = "name_"
 ) -> dict[int, Any]:
     """
-    Transforms entities with translated names into a dictionary mapping entity IDs to language-specific names.
+    Transforms entities with translated names into a dictionary mapping entity IDs
+    to language-specific names.
 
     :param prefix: The prefix used in the entity keys to identify language-specific names.
                    Default is "name_".

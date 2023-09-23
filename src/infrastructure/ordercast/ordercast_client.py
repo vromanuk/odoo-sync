@@ -67,10 +67,16 @@ def error_handler(func: Callable[..., Response]) -> Callable[..., Response]:
                 )
             if response.status_code not in OK_STATUSES:
                 logger.error(
-                    f"Ordercast server error {response.status_code} {response.text} for `{func_name}`"
+                    f"""
+                    Ordercast server error {response.status_code} 
+                    {response.text} for `{func_name}`
+                """
                 )
                 raise OrdercastApiServerException(
-                    f"Request `{func_name}` failed => {response.status_code} {response.text}"
+                    f"""
+                    Request `{func_name}` failed => 
+                    {response.status_code} {response.text}
+                """
                 )
             return response
         except Exception as e:

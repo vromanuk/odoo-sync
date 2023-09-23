@@ -26,7 +26,8 @@ def validate_categories(categories: dict[str, Any]) -> None:
     for category in categories:
         if is_empty(category, "id"):
             logger.error(
-                f"Received category with name '{category['name']}' has no remote id. Please correct it in Odoo."
+                f"Received category with name '{category['name']}'"
+                f"has no remote id. Please correct it in Odoo."
             )
             has_error = True
 
@@ -35,17 +36,20 @@ def validate_categories(categories: dict[str, Any]) -> None:
             unique_names = unique_names_dict.setdefault(field, set())
             if is_empty(category, field):
                 logger.error(
-                    f"Received category with remote id '{category['id']}' has no '{field}' field. Please correct it in Odoo."
+                    f"Received category with remote id '{category['id']}'"
+                    f"has no '{field}' field. Please correct it in Odoo."
                 )
                 has_error = True
             if not is_unique_by(unique_names, category, field):
                 logger.error(
-                    f"Received category with '{field}' = '{category[field]}' should be unique. Please correct it in Odoo."
+                    f"Received category with '{field}' = '{category[field]}'"
+                    f"should be unique. Please correct it in Odoo."
                 )
                 has_error = True
             if is_length_not_in_range(category[field], 1, 127):
                 logger.error(
-                    f"Received category with '{field}' = '{category[field]}' has more than max 127 symbols. Please correct it in Odoo."
+                    f"Received category with '{field}' = '{category[field]}'"
+                    f"has more than max 127 symbols. Please correct it in Odoo."
                 )
                 has_error = True
 

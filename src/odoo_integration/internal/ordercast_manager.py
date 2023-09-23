@@ -446,7 +446,8 @@ class OrdercastManager:
                     warehouse_dto["_remote_id"] = odoo_warehouse.odoo_id
                 else:
                     logger.info(
-                        f"The warehouse name '{warehouse.name}' has no remote id. Please sync it first with Odoo."
+                        f"The warehouse name '{warehouse.name}' has no remote id."
+                        f"Please sync it first with Odoo."
                     )
                 order_dto["warehouse"] = warehouse_dto
 
@@ -480,11 +481,16 @@ class OrdercastManager:
                 if "invoice_file_data" in order:
                     # self.save_file(order['invoice_file_name'], order['invoice_file_data'], existing_order.invoice)
                     logger.info(
-                        f"Invoice file {order['invoice_file_name']} added for order {existing_order.id}."
+                        f"Invoice file {order['invoice_file_name']} "
+                        f"added for order {existing_order.id}."
                     )
                 elif existing_order.invoice:
                     logger.info(
-                        f"Invoice file {existing_order.invoice.url.split('/')[-1] if existing_order.invoice and existing_order.invoice.url else ''} removed from order {existing_order.id}."
+                        f"""
+                        Invoice file {existing_order.invoice.url.split('/')[-1] 
+                        if existing_order.invoice and existing_order.invoice.url else ''} 
+                        removed from order {existing_order.id}.
+                        """
                     )
                     # self.delete_file(existing_order.invoice)
 
@@ -513,7 +519,8 @@ class OrdercastManager:
                 self.update_order_status(existing_order, odoo_order, order)
             else:
                 logger.error(
-                    f"Address with remote_id={order['id']} not exists in the system, please run sync task first."
+                    f"Address with remote_id={order['id']} "
+                    f"not exists in the system, please run sync task first."
                 )
 
     def update_order_status(self, existing_order, external_order, order):
@@ -529,21 +536,32 @@ class OrdercastManager:
                 ]
             ):
                 logger.info(
-                    f"Order '{order['name']}' has Odoo oder status: '{external_order.odoo_order_status}' and invoice status: '{external_order.odoo_invoice_status}', updating to 'Processed'."
+                    f"""
+                    Order '{order['name']}' has Odoo oder status: 
+                    '{external_order.odoo_order_status}' and 
+                    invoice status: '{external_order.odoo_invoice_status}', 
+                    updating to 'Processed'.
+                    """
                 )
                 if existing_order.invoice:
                     url = utils.get_invoice_full_url(existing_order.invoice)
                     existing_order.processed(url)
                 else:
                     logger.warn(
-                        f"Order '{order['name']}' has no invoice file, so changing status to 'Processed' ignored."
+                        f"Order '{order['name']}' has no invoice file, "
+                        f"so changing status to 'Processed' ignored."
                     )
             elif (
                 external_order.odoo_order_status == OrderStatus.DONE_STATUS
                 and existing_order.status != OrderStatus.COMPLETED_STATUS
             ):
                 logger.info(
-                    f"Order '{order['name']}' has Odoo oder status: '{external_order.odoo_order_status}' and invoice status: '{external_order.odoo_invoice_status}', updating to 'Completed'."
+                    f"""
+                    Order '{order['name']}' has Odoo oder status:
+                    '{external_order.odoo_order_status}' and 
+                    invoice status: '{external_order.odoo_invoice_status}',
+                    updating to 'Completed'.
+                    """
                 )
                 existing_order.complete()
             elif (
@@ -551,18 +569,27 @@ class OrdercastManager:
                 and existing_order.status != OrderStatus.CANCELLED_BY_ADMIN_STATUS
             ):
                 logger.info(
-                    f"Order '{order['name']}' has Odoo oder status: '{external_order.odoo_order_status}' and invoice status: '{external_order.odoo_invoice_status}', updating to 'Cancelled'."
+                    f"""
+                    Order '{order['name']}' has Odoo oder status:
+                    '{external_order.odoo_order_status}' and 
+                    invoice status: '{external_order.odoo_invoice_status}',
+                    updating to 'Cancelled'.
+                    """
                 )
                 if existing_order.status in [
                     OrderStatus.SUBMITTED_STATUS,
                     OrderStatus.IN_PROGRESS_STATUS,
                 ]:
-                    existing_order.cancel(
-                        existing_order.operator
-                    )  # todo: add original operator or admin from local user list. it is imposible now to find out the original canceller user
+                    existing_order.cancel(existing_order.operator)
                 else:
                     logger.warn(
-                        f"Order '{order['name']}' can not be cancelled, since it has '{existing_order.status}' status and only orders with '{OrderStatus.SUBMITTED_STATUS}' or '{OrderStatus.IN_PROGRESS_STATUS}' statuses permitted to cancel."
+                        f"""
+                        Order {order['name']} can not be cancelled, 
+                        since it has '{existing_order.status}' status
+                        and only orders with {OrderStatus.SUBMITTED_STATUS}
+                        or {OrderStatus.IN_PROGRESS_STATUS}'
+                        statuses permitted to cancel.
+                        """
                     )
             existing_order.save()
         except Exception as exc:

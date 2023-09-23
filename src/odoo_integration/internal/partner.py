@@ -74,34 +74,47 @@ def validate_partners(
     for user in partners:
         if is_empty(user, "id"):
             logger.error(
-                f"Received user with name '{user['name']}' has no remote id. Please correct it in Odoo."
+                f"Received user with name '{user['name']}' "
+                f"has no remote id. Please correct it in Odoo."
             )
             has_error = True
         if is_empty(user, "name"):
             logger.error(
-                f"Received user with id '{user['id']}' has no name. Please correct it in Odoo."
+                f"Received user with id '{user['id']}' "
+                f"has no name. Please correct it in Odoo."
             )
             has_error = True
         if is_empty(user, "email"):
             logger.error(
-                f"Received user with id '{user['id']}' has no email. Please correct it in Odoo."
+                f"Received user with id '{user['id']}' "
+                f"has no email. Please correct it in Odoo."
             )
             has_error = True
         if not is_unique_by(unique_names, user, "email"):
             logger.error(
-                f"Received user with email '{user['email']}' should be unique. Please correct it in Odoo (check partners which has no children or archived)."
+                f"Received user with email '{user['email']}' "
+                f"should be unique. "
+                f"Please correct it in Odoo "
+                f"(check partners which has no children or archived)."
             )
             has_error = True
         if "name" in user and is_length_not_in_range(user["name"], 1, 150):
             logger.error(
-                f"Received user with name '{user['name']}' has more than max 150 symbols. Please correct it in Odoo."
+                f"Received user with name '{user['name']}'"
+                f"has more than max 150 symbols. "
+                f"Please correct it in Odoo."
             )
             has_error = True
 
         if user["id"] in existing_ordercast_users:
             ordercast_user = existing_ordercast_users[user["id"]]
             logger.error(
-                f"Received user with name `{user['name']}` already exists in Ordercast, id => `{ordercast_user['id']}` and name => `{ordercast_user['name']}`. Please give the another email to this '{user['name']}' partner in Odoo (check partners which has no children or archived)."
+                f"""
+                Received user with name `{user['name']}` already exists in Ordercast,
+                id => `{ordercast_user['id']}` and name => `{ordercast_user['name']}`.
+                Please give the another email to this '{user['name']}' partner in
+                Odoo (check partners which has no children or archived).
+                """
             )
             has_error = True
 

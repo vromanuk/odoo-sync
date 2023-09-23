@@ -174,13 +174,16 @@ class OdooManager:
                     create_remote_user = False
                 else:
                     logger.warn(
-                        f"User with remote id '{remote_id}' not exists in Odoo, it seems it was deleted there."
+                        f"User with remote id '{remote_id}' not exists in Odoo, "
+                        f"it seems it was deleted there."
                     )
                     logger.info(
-                        "To preserve the integrity of the synchronization, it will be created a new in Odoo."
+                        "To preserve the integrity of the synchronization, "
+                        "it will be created a new in Odoo."
                     )
                     logger.info(
-                        f"Try first to find existing user in Odoo by email '{copy_user['email']}'."
+                        f"Try first to find existing user in Odoo "
+                        f"by email '{copy_user['email']}'."
                     )
                     existing_remote_users = remote_users_obj.search_read(
                         domain=[
@@ -190,11 +193,12 @@ class OdooManager:
                             ("parent_id", "=", False),
                         ],
                         fields=["id"],
-                    )  # not required this condition:  copy_user['type'] = self.PartnerAddressType.CONTACT.value, since by email paretn contacts should be unique
+                    )
                     if existing_remote_users and len(existing_remote_users) > 0:
                         remote_id = existing_remote_users[0]["id"]
                         logger.info(
-                            f"Found user with remote id '{remote_id}' and it will be updated."
+                            f"Found user with remote id '{remote_id}'"
+                            f"and it will be updated."
                         )
                         remote_users_obj.write(remote_id, copy_user)
                         create_remote_user = False
@@ -208,9 +212,6 @@ class OdooManager:
                 copy_user["_remote_id"] = remote_id
                 user["_remote_id"] = remote_id
 
-            # UserExternal.all_objects.update_or_create(
-            #     user_id=user["id"], defaults={"odoo_id": remote_id, "is_removed": False}
-            # )
             self.repo.insert(
                 key=RedisKeys.USERS,
                 entity=OdooUser(
@@ -263,14 +264,24 @@ class OdooManager:
                 for remote_id in delete_remote_ids:
                     if {"id": remote_id} not in existing_ids:
                         logger.warn(
-                            f"The address with remote_id '{remote_id}' not found in Odoo, seems was not synced properly, deleting this external link record locally."
+                            f"""
+                            The address with remote_id '{remote_id}' not found in Odoo,
+                            seems was not synced properly,
+                            deleting this external link record locally.
+                            """
                         )
                 if len(existing_ids) > 0:
                     try:
                         remote_users_obj.unlink(ids=[p["id"] for p in existing_ids])
                     except JSONRPCError as exc:
+                        logger.error()
                         logger.error(
-                            f"It some addresses with remote ids '{[p['id'] for p in existing_ids]}' can't be deleted in Odoo, cause it might be used. Deleting these external link records locally."
+                            f"""
+                            It some addresses with remote ids 
+                            '{[p['id'] for p in existing_ids]}' 
+                            can't be deleted in Odoo, cause it might be used. 
+                            Deleting these external link records locally.
+                            """
                         )
                         logger.error(f"{str(exc)}")
             external_addresses_for_delete.delete()
@@ -278,12 +289,6 @@ class OdooManager:
     def sync_partner(self, partner: dict[str, Any]) -> None:
         client = self._client
         remote_partner_obj = client["res.partner"]
-        # if '_remote_id' not in partner:
-        #     remote_users = remote_partner_obj.search_read([("email", "=", partner['email'])])
-        #     if remote_users:
-        #         for remote in remote_users:
-        #             partner['_remote_id'] = remote['id']
-        #             break
         remote_country_obj = client["res.country"]
         remote_state_obj = client["res.country.state"]
         remote_supported_langs = client["res.lang"].search_read(domain=[])
@@ -355,7 +360,8 @@ class OdooManager:
                 create_remote_partner = False
             else:
                 logger.warn(
-                    f"User with remote id '{remote_id}' not exists in Odoo, it seems it was deleted there. "
+                    f"User with remote id '{remote_id}' not exists in Odoo,"
+                    f"it seems it was deleted there. "
                 )
                 if remote_id:
                     # AddressExternal.all_objects.filter(odoo_id=remote_id).delete()
@@ -366,9 +372,6 @@ class OdooManager:
 
         partner["_remote_id"] = remote_id
         send_partner["id"] = remote_id
-        # AddressExternal.objects.update_or_create(
-        #     address_id=partner["id"], odoo_id=remote_id, defaults={"is_removed": False}
-        # )
         self.repo.insert(
             key=RedisKeys.ADDRESSES,
             entity=OdooAddress(
@@ -528,7 +531,8 @@ class OdooManager:
                 product_variant_dto["price"] = product_variant["lst_price"]
             elif "list_price" in product_variant and product_variant["list_price"]:
                 logger.warn(
-                    f"Product '{product_variant['display_name']}' has no 'lst_price' so setting 'list_price'."
+                    f"Product '{product_variant['display_name']}' "
+                    f"has no 'lst_price' so setting 'list_price'."
                 )
                 product_variant_dto["price"] = product_variant["list_price"]
             if "image_1920" in product_variant and product_variant["image_1920"]:
@@ -839,7 +843,11 @@ class OdooManager:
                 send_order["warehouse_id"] = warehouse_dto["_remote_id"]
             else:
                 logger.info(
-                    f"Sending order id '{order_dto['id']}' has no order warehouse. Please make full sync with Odoo first."
+                    f"""
+                    Sending order id '{order_dto['id']}' 
+                    has no order warehouse. 
+                    Please make full sync with Odoo first.
+                    """
                 )
             create_remote_order = True
             remote_order_id = None
@@ -1062,13 +1070,22 @@ class OdooManager:
                                 order_line_dto["product_id"] = product.id
                                 order_line_dto["name"] = product.name
                             else:
-                                msg = f"Odoo product for remote_id = {product_id} not found. Please sync products first to make this working properly."
+                                msg = f"""
+                                Odoo product for remote_id = {product_id} not found. 
+                                Please sync products first to make this working properly
+                                """
                                 logger.error(msg)
                                 raise OdooSyncException(msg)
                             order_line_dto["_remote_product_id"] = product_id  # not id
                         else:
                             logger.warn(
-                                f"Order '{order_dto['name']}' has item '{(order_line['display_type'] + '/' if 'display_type' in order_line else '') + (order_line['name'] if 'name' in order_line else '')}' which is ignored."
+                                f"""
+                                "Order '{order_dto['name']}' has item 
+                                '{(order_line['display_type'] + '/' 
+                                if 'display_type' in order_line else '') + 
+                                (order_line['name'] if 'name' in order_line else '')}' 
+                                which is ignored.
+                                """
                             )
                     order_line_dtos.append(order_line_dto)
                 order_dto["order_lines"] = order_line_dtos
