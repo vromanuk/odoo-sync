@@ -88,6 +88,9 @@ class OdooClient:
     def get_discounts(self) -> str:
         return self._config.ODOO_DISCOUNTS
 
+    def __getitem__(self, item: str) -> Any:
+        return self._client[item]
+
 
 def get_odoo_client(settings: Annotated[Settings, Depends(get_settings)]) -> OdooClient:
     return OdooClient(settings.ODOO)

@@ -794,7 +794,7 @@ class OdooManager:
                 if "warehouse" in order_dto and order_dto["warehouse"]
                 else None
             )
-            basket_dto = order_dto["basket"]
+            basket_dto = order_dto.get("basket", {})
 
             if is_not_empty(order_dto, "user_remote_id"):
                 send_order["partner_id"] = order_dto["user_remote_id"]
@@ -830,9 +830,10 @@ class OdooManager:
                 {
                     "reference": order_dto["name"],
                     "name": order_dto["name"],
-                    "amount_tax": basket_dto["total_taxes"],
-                    "amount_total": basket_dto["grand_total"],
-                    "amount_untaxed": basket_dto["total"],
+                    "amount_tax": basket_dto.get("total_taxes", 0),
+                    "amount_total": basket_dto.get("grand_total", 0),
+                    "amount_untaxed": basket_dto.get("total", 0),
+                    "partner_id": order_dto["partner_id"],
                 }
             )
 

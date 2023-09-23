@@ -381,6 +381,7 @@ class OrdercastManager:
                 "status": order.status,
                 "_remote_id": order.external_id,
                 "user_remote_id": ordercast_order.merchant.external_id,
+                "partner_id": 20,  # TODO: replace default
             }
             if order.shipping_address:
                 order_dto["shipping_address"] = order.shipping_address
