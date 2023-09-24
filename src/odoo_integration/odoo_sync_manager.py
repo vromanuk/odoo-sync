@@ -93,7 +93,7 @@ class OdooSyncManager:
     def sync_users_from_ordercast_to_odoo(self) -> None:
         users_to_sync = self.ordercast_manager.get_users_with_related_entities()
         logger.info(
-            f"Received merchants => {len(users_to_sync)},started syncing with Odoo."
+            f"Received merchants => {len(users_to_sync)}, started syncing with Odoo."
         )
         self.odoo_manager.sync_users(users_to_sync)
 

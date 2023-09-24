@@ -132,6 +132,11 @@ class OdooRepo:
     def get_key(self, key: RedisKeys) -> Any:
         return self._client.get(f"{self._prefix}:{key}")
 
+    def get_all(self, key: RedisKeys) -> list[int]:
+        entity_schema = self._schema.get(key)
+        entity_key = entity_schema.get("key")
+        return list(self._client.sscan(entity_key))
+
     def get_len(self, key: RedisKeys) -> int:
         entity_schema = self._schema[key]
         entity_key = entity_schema["key"]

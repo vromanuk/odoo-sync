@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Awaitable
+from typing import Annotated, Any, Awaitable, Iterator
 
 import redis
 from fastapi import Depends
@@ -19,6 +19,9 @@ class RedisClient:
 
     def set(self, key: str, entity: str) -> None:
         self._client.set(name=key, value=entity)
+
+    def sscan(self, key: str) -> Iterator:
+        return self._client.sscan_iter(key)
 
     def get_many(self, key: str) -> list[OdooEntity]:
         entity_ids = self._client.sscan_iter(key)

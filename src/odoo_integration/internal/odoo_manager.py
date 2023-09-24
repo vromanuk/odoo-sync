@@ -902,7 +902,9 @@ class OdooManager:
             )
             return []
 
-        orders = self.get_remote_updated_objects("sale.order")
+        synced_orders = self.repo.get_all(RedisKeys.ORDERS)
+        odoo_orders = self.get_remote_updated_objects("sale.order")
+        orders = [o for o in odoo_orders if o["id"] not in synced_orders]
 
         if orders_invoice_attach_pending:
             status_check_orders = self._client.get_odoo_entities(
