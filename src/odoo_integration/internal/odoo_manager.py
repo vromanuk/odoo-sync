@@ -1045,6 +1045,7 @@ class OdooManager:
                     city=user["city"],
                     postcode=user["postcode"],
                     street=user["street"],
+                    user=user["ordercast_id"],
                 )
                 for user in users_to_sync
             ],

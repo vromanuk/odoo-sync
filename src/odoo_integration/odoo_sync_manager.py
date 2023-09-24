@@ -85,10 +85,11 @@ class OdooSyncManager:
         users_to_sync = [
             get_partner_data(partner) for partner in partners if partner["email"]
         ]
-
         self.ordercast_manager.upsert_users(users_to_sync=users_to_sync)
+        users_to_sync = self.set_ordercast_id(users_to_sync)
+
         self.odoo_manager.save_users(users_to_sync=users_to_sync)
-        self.sync_billing(users=users_to_sync)
+        self.sync_billing(users_to_sync=users_to_sync)
 
     def sync_users_from_ordercast_to_odoo(self) -> None:
         users_to_sync = self.ordercast_manager.get_users_with_related_entities()
@@ -97,8 +98,8 @@ class OdooSyncManager:
         )
         self.odoo_manager.sync_users(users_to_sync)
 
-    def sync_billing(self, users: list[dict[str, Any]]) -> None:
-        for partner in users:
+    def sync_billing(self, users_to_sync: list[dict[str, Any]]) -> None:
+        for partner in users_to_sync:
             self.ordercast_manager.create_billing_address(partner)
             self.ordercast_manager.create_shipping_address(partner)
 
@@ -316,6 +317,20 @@ class OdooSyncManager:
         )
         if orders:
             self.ordercast_manager.sync_orders(orders)
+
+    def set_ordercast_id(
+        self, users_to_sync: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        users_with_ordercast_id = users_to_sync.copy()
+
+        user_mapper = {u["erp_id"]: u for u in users_with_ordercast_id}
+        synced_users = self.ordercast_manager.get_users()
+
+        for synced_user in synced_users:
+            if user := user_mapper.get(synced_user.erp_id):
+                user["ordercast_id"] = synced_user.id
+
+        return users_with_ordercast_id
 
 
 def get_odoo_sync_manager(

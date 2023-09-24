@@ -91,7 +91,7 @@ class OrdercastManager:
         for billing_address in user["odoo_data"]["billing_addresses"]:
             self.ordercast_api.create_billing_address(
                 CreateBillingAddressRequest(
-                    merchant_id=user["merchant_id"],
+                    merchant_id=user["ordercast_id"],
                     name=billing_address["name"],
                     street=billing_address["address_one"],
                     city=billing_address["city"],
@@ -111,7 +111,7 @@ class OrdercastManager:
         for shipping_address in user["odoo_data"]["shipping_addresses"]:
             self.ordercast_api.create_shipping_address(
                 CreateShippingAddressRequest(
-                    merchant_id=user["merchant_id"],
+                    merchant_id=user["ordercast_id"],
                     name=shipping_address["name"],
                     street=shipping_address["address_one"],
                     city=shipping_address["city"],
