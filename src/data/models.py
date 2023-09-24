@@ -46,13 +46,13 @@ class OdooOrder(OdooCommons):
 
 
 class OdooUser(OdooCommons):
-    email: EmailStr
-    street: str
-    city: str
-    postcode: str
-    country: str
-    contact_name: str
-    contact_phone: str
+    email: EmailStr = ""
+    street: str = ""
+    city: str = ""
+    postcode: str = ""
+    country: str = ""
+    contact_name: str = ""
+    contact_phone: str = ""
     user: Optional[PositiveInt] = None
 
 
@@ -68,7 +68,7 @@ class OdooPickupLocation(OdooCommons):
 
 class OdooAddress(OdooCommons):
     address: PositiveInt
-    original_address_id: PositiveInt
+    original_address_id: Optional[PositiveInt] = None
 
 
 class OdooBasketProduct(OdooCommons):

@@ -381,7 +381,7 @@ class OrdercastManager:
                 "status": order.status,
                 "_remote_id": order.external_id,
                 "user_remote_id": ordercast_order.merchant.external_id,
-                "partner_id": 20,  # TODO: replace default
+                "partner_id": ordercast_order.merchant.external_id,
             }
             if order.shipping_address:
                 order_dto["shipping_address"] = order.shipping_address
@@ -551,6 +551,17 @@ class OrdercastManager:
         except Exception as exc:
             logger.error("Error during updating order status locally.")
             raise exc
+
+    def get_users_with_related_entities(self) -> list[OrdercastFlatMerchant]:
+        users = self.get_users()
+        billing_addresses = {m.id: self.get_billing_addresses(m.id) for m in users}
+        shipping_addresses = {m.id: self.get_shipping_addresses(m.id) for m in users}
+
+        for user in users:
+            user.billing_addresses = billing_addresses.get(user.id, [])
+            user.shipping_addresses = shipping_addresses.get(user.id, [])
+
+        return users
 
 
 def get_ordercast_manager(

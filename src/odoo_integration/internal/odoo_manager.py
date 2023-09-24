@@ -3,7 +3,6 @@ from typing import Annotated, Optional, Any
 
 import structlog
 from fastapi import Depends
-from odoo_rpc_client.connection.jsonrpc import JSONRPCError
 
 from src.data import (
     OdooUser,
@@ -21,6 +20,7 @@ from src.data import (
     OdooDeliveryOption,
     OdooPickupLocation,
     InvoiceStatus,
+    OrdercastFlatMerchant,
 )
 from src.infrastructure import OdooClient, get_odoo_client
 from .exceptions import OdooSyncException
@@ -136,14 +136,13 @@ class OdooManager:
             for partner in partners
         ]
 
-    def sync_users(self, users: list[dict[str, Any]]) -> None:
+    def sync_users(self, users: list[OrdercastFlatMerchant]) -> None:
         remote_users_obj = self._client["res.partner"]
         remote_supported_langs = self._client.get_odoo_entities("res.lang")
         for user in users:
-            copy_user = user.copy()
+            copy_user = user.model_dump()
 
-            del copy_user["id"]
-            # copy_user['login'] = copy_user['email']
+            copy_user.pop("id", None)
             if "language" in copy_user and copy_user["language"]:
                 language_iso = copy_user.pop("language")
                 for lang in remote_supported_langs:
@@ -165,9 +164,8 @@ class OdooManager:
             if is_not_empty(copy_user, "shipping_addresses"):
                 shipping_addresses = copy_user.pop("shipping_addresses")
             create_remote_user = True
-            remote_id = None
-            if "_remote_id" in copy_user:
-                remote_id = copy_user.pop("_remote_id")
+            remote_id = copy_user.pop("erp_id", None)
+            if remote_id:
                 existing_remote_users = remote_users_obj.search_read(
                     domain=[("active", "in", [True, False]), ("id", "=", remote_id)],
                     fields=["id"],
@@ -186,13 +184,13 @@ class OdooManager:
                     )
                     logger.info(
                         f"Try first to find existing user in Odoo "
-                        f"by email '{copy_user['email']}'."
+                        f"by email {copy_user.get('email', '')}."
                     )
                     existing_remote_users = remote_users_obj.search_read(
                         domain=[
                             ("active", "in", [True, False]),
                             ("is_company", "=", False),
-                            ("email", "=", copy_user["email"]),
+                            ("email", "=", copy_user.get("email", "")),
                             ("parent_id", "=", False),
                         ],
                         fields=["id"],
@@ -213,14 +211,18 @@ class OdooManager:
             if create_remote_user:
                 remote_id = remote_users_obj.create(copy_user)
                 copy_user["_remote_id"] = remote_id
-                user["_remote_id"] = remote_id
 
             self.repo.insert(
                 key=RedisKeys.USERS,
                 entity=OdooUser(
                     odoo_id=remote_id,
                     sync_date=datetime.now(timezone.utc),
-                    user=user["id"],
+                    user=user.id,
+                    street=user.billing_addresses[0]["address"]["street"],
+                    city=user.billing_addresses[0]["address"]["city"],
+                    postcode=user.billing_addresses[0]["address"]["postcode"],
+                    country=user.billing_addresses[0]["address"]["country"],
+                    contact_name=user.billing_addresses[0]["address"]["contact_name"],
                 ),
             )
 
@@ -245,50 +247,6 @@ class OdooManager:
                     shipping_address["type"] = PartnerAddressType.DELIVERY.value
                     self.sync_partner(shipping_address)
 
-        # sync deleted local addresses with remote partners
-        logger.info("Deleting unused addresses.")
-        # external_addresses_for_delete = AddressExternal.all_objects.filter(
-        #     address_id__isnull=True, original_address_id__isnull=False
-        # )
-        external_addresses_for_delete = []
-        if external_addresses_for_delete and external_addresses_for_delete.count() > 0:
-            delete_remote_ids = [
-                o
-                for o in external_addresses_for_delete.values_list("odoo_id", flat=True)
-            ]
-            existing_ids = remote_users_obj.search_read(
-                domain=[
-                    ("id", "in", delete_remote_ids),
-                    ("active", "in", [True, False]),
-                ],
-                fields=["id"],
-            )  # note: always use this 'active' criteria for unlink
-            if existing_ids is not None:
-                for remote_id in delete_remote_ids:
-                    if {"id": remote_id} not in existing_ids:
-                        logger.warn(
-                            f"""
-                            The address with remote_id '{remote_id}' not found in Odoo,
-                            seems was not synced properly,
-                            deleting this external link record locally.
-                            """
-                        )
-                if len(existing_ids) > 0:
-                    try:
-                        remote_users_obj.unlink(ids=[p["id"] for p in existing_ids])
-                    except JSONRPCError as exc:
-                        logger.error()
-                        logger.error(
-                            f"""
-                            It some addresses with remote ids 
-                            '{[p['id'] for p in existing_ids]}' 
-                            can't be deleted in Odoo, cause it might be used. 
-                            Deleting these external link records locally.
-                            """
-                        )
-                        logger.error(f"{str(exc)}")
-            external_addresses_for_delete.delete()
-
     def sync_partner(self, partner: dict[str, Any]) -> None:
         client = self._client
         remote_partner_obj = client["res.partner"]
@@ -297,9 +255,10 @@ class OdooManager:
         remote_supported_langs = client["res.lang"].search_read(domain=[])
         send_partner = {
             "name": partner["name"],
-            "email": partner["email"],
-            "street": partner["address_one"],
-            "zip": partner["postal_code"],
+            "email": partner.get("email" ""),
+            "street": partner["address"]["street"],
+            "zip": partner["address"]["postcode"],
+            "city": partner["address"]["city"],
             "is_company": False,
             "active": True,
         }
@@ -314,10 +273,8 @@ class OdooManager:
             send_partner["comment"] = partner["comment"]
         if "phone" in partner:
             send_partner["phone"] = partner["phone"]
-        if "city" in partner:
-            send_partner["city"] = partner["city"]
-        if "parent_id" in partner:
-            send_partner["parent_id"] = partner["parent_id"]
+        if parent_id := partner.get("parent_id"):
+            send_partner["parent_id"] = parent_id
         if "type" in partner:
             send_partner["type"] = partner["type"]
 
@@ -329,10 +286,8 @@ class OdooManager:
                 ):
                     send_partner["lang"] = lang["code"]
                     break
-        if "country" in partner and partner["country"]:
-            remote_countries = remote_country_obj.search_read(
-                [("name", "=", partner["country"])]
-            )
+        if country := partner["address"].get("country"):
+            remote_countries = remote_country_obj.search_read([("name", "=", country)])
             if remote_countries:
                 for remote_country in remote_countries:
                     send_partner["country_id"] = remote_country["id"]
@@ -367,7 +322,6 @@ class OdooManager:
                     f"it seems it was deleted there. "
                 )
                 if remote_id:
-                    # AddressExternal.all_objects.filter(odoo_id=remote_id).delete()
                     self.repo.remove(key=RedisKeys.ADDRESSES, entity_id=remote_id)
 
         if create_remote_partner:
@@ -380,11 +334,9 @@ class OdooManager:
             entity=OdooAddress(
                 odoo_id=remote_id,
                 sync_date=datetime.now(timezone.utc),
-                address=partner["id"],
-                original_address_id=partner["id"],
+                address=remote_id,
             ),
         )
-        return send_partner
 
     def get_products(self, from_date: Optional[datetime] = None) -> dict[str, Any]:
         products = self.get_remote_updated_objects(
@@ -431,6 +383,7 @@ class OdooManager:
     def get_remote_updated_objects(
         self,
         remote_object_name: str,
+        from_date: Optional[datetime] = None,
         i18n_fields: list[str] = None,
         filter_criteria: Any = None,
         remote_ids: Optional[list] = None,
@@ -1065,10 +1018,10 @@ class OdooManager:
                         else:
                             logger.warn(
                                 f"""
-                                "Order '{order_dto['name']}' has item 
-                                '{(order_line['display_type'] + '/'
-                                                                                                                                  if 'display_type' in order_line else '') +
-                                  (order_line['name'] if 'name' in order_line else '')}' 
+                                "Order {order_dto['name']} has item 
+                                {(order_line['display_type'] + '/'
+                                if 'display_type' in order_line else '') +
+                                (order_line['name'] if 'name' in order_line else '')}
                                 which is ignored.
                                 """
                             )

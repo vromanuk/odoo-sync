@@ -29,6 +29,7 @@ from .ordercast_models import (
     OrdercastFlatOrder,
     OrdercastOrderStatus,
     OrdercastOrder,
+    OrdercastMerchant,
 )
 from .typings import OdooEntity
 
@@ -61,4 +62,5 @@ __all__ = (
     "OrderStatusForSync",
     "OrdercastOrderStatus",
     "OrdercastOrder",
+    "OrdercastMerchant",
 )

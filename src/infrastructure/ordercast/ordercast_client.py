@@ -106,7 +106,7 @@ class OrdercastApi:
     @error_handler
     def get_merchants(self, request: ListMerchantsRequest) -> Response:
         return httpx.get(
-            url=f"{self.base_url}/company/merchant/321pageIndex={request.pageIndex}&pageSize={request.pageSize}&prevId={request.prevId}",
+            url=f"{self.base_url}/company/merchant/?pageIndex={request.pageIndex}&pageSize={request.pageSize}&prevId={request.prevId}",
             headers=self._auth_headers,
         )
 

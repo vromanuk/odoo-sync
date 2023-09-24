@@ -68,9 +68,10 @@ class OdooSyncManager:
 
     def sync_users(self) -> None:
         logger.info("Started syncing user's data with Ordercast")
-        self.sync_users_from_odoo()
+        self.sync_users_from_odoo_to_ordercast()
+        self.sync_users_from_ordercast_to_odoo()
 
-    def sync_users_from_odoo(self) -> None:
+    def sync_users_from_odoo_to_ordercast(self) -> None:
         existing_odoo_users = self.repo.get_list(key=RedisKeys.USERS)
         partners = self.odoo_manager.receive_partner_users(
             exclude_user_ids=[p.odoo_id for p in existing_odoo_users]
@@ -88,6 +89,13 @@ class OdooSyncManager:
         self.ordercast_manager.upsert_users(users_to_sync=users_to_sync)
         self.odoo_manager.save_users(users_to_sync=users_to_sync)
         self.sync_billing(users=users_to_sync)
+
+    def sync_users_from_ordercast_to_odoo(self) -> None:
+        users_to_sync = self.ordercast_manager.get_users_with_related_entities()
+        logger.info(
+            f"Received merchants => {len(users_to_sync)},started syncing with Odoo."
+        )
+        self.odoo_manager.sync_users(users_to_sync)
 
     def sync_billing(self, users: list[dict[str, Any]]) -> None:
         for partner in users:

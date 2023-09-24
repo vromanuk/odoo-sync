@@ -9,10 +9,6 @@ class OrdercastCommon(BaseModel):
     name: str
 
 
-class OrdercastFlatMerchant(OrdercastCommon):
-    erp_id: Optional[str]
-
-
 class OrdercastProduct(OrdercastCommon):
     sku: str
 
@@ -49,27 +45,6 @@ class OrdercastMerchantStatus(BaseModel):
     color: str
     enum: int
     name: str
-
-
-class OrdercastMerchant(BaseModel):
-    erp_id: str
-    external_id: str = ""
-    info: str = ""
-    name: str = ""
-    phone: str = ""
-    sector_id: PositiveInt
-    vat: str = ""
-    website: str = ""
-    id: PositiveInt
-    created_at: datetime
-    price_rate_id: int
-    note: str = ""
-    is_payment_required: bool
-    corporate_status_name: str
-    prices_pdf: Optional[dict[str, Any]] = None
-    price_rate: Optional[dict[str, Any]] = None
-    catalogs: list[OrdercastMerchantCatalog] = []
-    status: OrdercastMerchantStatus
 
 
 class OrdercastDeliveryMethod(BaseModel):
@@ -146,6 +121,33 @@ class OrdercastBillingAddress(BaseModel):
     street: str
     corporate_status_name: str
     vat: str
+
+
+class OrdercastMerchant(BaseModel):
+    id: PositiveInt
+    erp_id: str
+    status: OrdercastMerchantStatus
+    is_payment_required: bool
+    corporate_status_name: str
+    sector_id: PositiveInt
+    created_at: datetime
+    price_rate_id: int
+    external_id: str = ""
+    info: str = ""
+    name: str = ""
+    phone: str = ""
+    vat: str = ""
+    website: str = ""
+    note: str = ""
+    prices_pdf: Optional[dict[str, Any]] = None
+    price_rate: Optional[dict[str, Any]] = None
+    catalogs: list[OrdercastMerchantCatalog] = []
+
+
+class OrdercastFlatMerchant(OrdercastCommon):
+    erp_id: str = ""
+    billing_addresses: list[OrdercastBillingAddress] = []
+    shipping_addresses: list[OrdercastShippingAddress] = []
 
 
 class OrdercastFlatOrder(BaseModel):
