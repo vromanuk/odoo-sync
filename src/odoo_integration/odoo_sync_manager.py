@@ -99,7 +99,6 @@ class OdooSyncManager:
 
     def sync_billing(self, users: list[dict[str, Any]]) -> None:
         for partner in users:
-            self.ordercast_manager.set_default_language(partner["language"])
             self.ordercast_manager.create_billing_address(partner)
             self.ordercast_manager.create_shipping_address(partner)
 

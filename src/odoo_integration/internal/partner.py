@@ -51,6 +51,8 @@ class Partner:
             )
         if is_not_empty(partner, "country_code"):
             partner_dto["country_code"] = partner["country_code"]
+        if is_not_empty(partner, "country_id"):
+            partner_dto["country"] = partner["country_id"][1]
         if is_not_empty(partner, "state_id"):
             if isinstance(partner["state_id"], list) and len(partner["state_id"]) == 2:
                 partner_dto["state_name"] = partner["state_id"][1]

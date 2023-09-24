@@ -92,14 +92,14 @@ class OrdercastManager:
             self.ordercast_api.create_billing_address(
                 CreateBillingAddressRequest(
                     merchant_id=user["merchant_id"],
-                    name=user["name"],
-                    street=user["street"],
-                    city=user["city"],
-                    postcode=user["postcode"],
-                    country=user["country"],
-                    contact_name=user["contact_name"],
-                    contact_phone=user["contact_phone"],
-                    corporate_status_name=user["corporate_status_name"],
+                    name=billing_address["name"],
+                    street=billing_address["address_one"],
+                    city=billing_address["city"],
+                    postcode=billing_address["postal_code"],
+                    country=billing_address["country"],
+                    contact_name=billing_address["name"],
+                    contact_phone=billing_address["phone"],
+                    corporate_status_name=billing_address["name"],
                     vat=user["vat"],
                 )
             )
@@ -111,14 +111,15 @@ class OrdercastManager:
         for shipping_address in user["odoo_data"]["shipping_addresses"]:
             self.ordercast_api.create_shipping_address(
                 CreateShippingAddressRequest(
-                    merchange_id=user["id"],
-                    name=user["name"],
-                    street=user["street"],
-                    city=user["city"],
-                    postcode=user["postcode"],
-                    country=user["country"],
-                    contact_name=user["contact_name"],
-                    contact_phone=user["contact_phone"],
+                    merchant_id=user["merchant_id"],
+                    name=shipping_address["name"],
+                    street=shipping_address["address_one"],
+                    city=shipping_address["city"],
+                    postcode=shipping_address["postal_code"],
+                    country=shipping_address["country"],
+                    contact_name=shipping_address["name"],
+                    contact_phone=shipping_address["phone"],
+                    corporate_status_name=shipping_address["name"],
                 )
             )
 
