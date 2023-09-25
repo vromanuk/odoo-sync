@@ -44,6 +44,7 @@ from src.infrastructure import (
 )
 from .constants import ORDER_STATUSES_FOR_SYNC
 from .odoo_repo import RedisKeys, OdooRepo
+from ...commons import get_ctx
 
 logger = structlog.getLogger(__name__)
 
@@ -64,9 +65,7 @@ class OrdercastManager:
         ]
 
     def upsert_users(self, users_to_sync: list[dict[str, Any]]) -> None:
-        # TODO cache or get from cache
-        default_sector_id = self.get_sector()
-        default_price_rate = self.get_default_price_rate()
+        ctx = get_ctx()
         logger.info("Saving users to Ordercast")
         self.ordercast_api.bulk_signup(
             request=[
@@ -84,8 +83,10 @@ class OrdercastManager:
                         name=user["name"],
                         phone=user["phone"],
                         city=user["city"],
-                        sector_id=user.get("sector_id", default_sector_id),
-                        price_rate_id=default_price_rate["id"],
+                        sector_id=user.get(
+                            "sector_id", ctx["commons"]["default_sector_id"]
+                        ),
+                        price_rate_id=ctx["commons"]["default_price_rate"]["id"],
                         postcode=user["postcode"],
                         street=user["street"],
                         vat=user["vat"],
@@ -269,9 +270,8 @@ class OrdercastManager:
         self,
         product_variants: list[dict[str, Any]],
         units: list[dict[str, Any]],
-        default_price_rate: dict[str, Any],
     ) -> None:
-        # TODO fetch from cache if exists
+        ctx = get_ctx()
         logger.info(f"Inserting units from product variants => {len(units)}")
         self.ordercast_api.upsert_units(
             request=[
@@ -294,7 +294,7 @@ class OrdercastManager:
                     price_rates=[
                         PriceRate(
                             price=product_variant["price"],
-                            price_rate_id=default_price_rate["id"],
+                            price_rate_id=ctx["commons"]["default_price_rate"]["id"],
                             quantity=1,
                         )
                     ],

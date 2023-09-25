@@ -4,6 +4,7 @@ import structlog
 import uvicorn
 from fastapi import FastAPI
 
+from src.commons import set_context_value
 from src.config import get_settings
 from src.endpoints import api_router
 
@@ -46,6 +47,7 @@ def configure_logging() -> None:
 
 @app.on_event("startup")
 async def startup() -> None:
+    set_context_value({})
     configure_logging()
 
 

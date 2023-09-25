@@ -10,3 +10,4 @@ httpx
 structlog
 regex
 tenacity
+contextvars

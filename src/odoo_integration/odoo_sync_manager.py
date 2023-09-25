@@ -5,9 +5,7 @@ from typing import Any, Annotated, Optional
 import structlog
 from fastapi import Depends
 
-from src.data import (
-    OdooPriceRate,
-)
+from src.commons import set_context_value
 from .internal.builders import (
     get_partner_data,
     get_attribute_data,
@@ -45,6 +43,9 @@ class OdooSyncManager:
         self.ordercast_manager = ordercast_manager
 
     def sync(self) -> None:
+        logger.info("Load common data")
+        self.load_commons()
+
         logger.info("Start full syncing with Odoo.")
         self.sync_users()
 
@@ -223,16 +224,6 @@ class OdooSyncManager:
                 "Starting saving product variants after"
                 "saving categories and attributes."
             )
-            default_price_rate = self.repo.get_key(RedisKeys.DEFAULT_PRICE_RATE)
-
-            if not default_price_rate:
-                default_price_rate = self.ordercast_manager.get_default_price_rate()
-                self.repo.set(
-                    key=RedisKeys.DEFAULT_PRICE_RATE,
-                    entity=OdooPriceRate(
-                        id=default_price_rate["id"], name=default_price_rate["name"]
-                    ),
-                )
 
             units = self.odoo_manager.get_units()
             ordercast_products = self.ordercast_manager.get_products()
@@ -251,7 +242,6 @@ class OdooSyncManager:
             self.ordercast_manager.save_product_variants(
                 product_variants=product_variants_to_sync,
                 units=units,
-                default_price_rate=default_price_rate,
             )
             self.odoo_manager.save_product_variants(product_variants_to_sync)
 
@@ -344,6 +334,19 @@ class OdooSyncManager:
                 user["ordercast_id"] = synced_user.id
 
         return users_with_ordercast_id
+
+    def load_commons(self) -> None:
+        default_sector_id = self.ordercast_manager.get_sector()
+        default_price_rate = self.ordercast_manager.get_default_price_rate()
+
+        set_context_value(
+            value={
+                "commons": {
+                    "default_sector_id": default_sector_id,
+                    "default_price_rate": default_price_rate,
+                }
+            }
+        )
 
 
 def get_odoo_sync_manager(
