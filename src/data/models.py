@@ -53,7 +53,7 @@ class OdooUser(OdooCommons):
     country: str = ""
     contact_name: str = ""
     contact_phone: str = ""
-    user: Optional[PositiveInt] = None
+    ordercast_user: Optional[PositiveInt] = None
 
 
 class OdooDeliveryOption(OdooCommons):

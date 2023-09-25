@@ -216,7 +216,7 @@ class OdooManager:
                 entity=OdooUser(
                     odoo_id=remote_id,
                     sync_date=datetime.now(timezone.utc),
-                    user=user.id,
+                    ordercast_user=user.id,
                     street=user.billing_addresses[0]["address"]["street"],
                     city=user.billing_addresses[0]["address"]["city"],
                     postcode=user.billing_addresses[0]["address"]["postcode"],
@@ -1035,6 +1035,7 @@ class OdooManager:
         return result
 
     def save_users(self, users_to_sync: list[dict[str, Any]]) -> None:
+        logger.info("Saving users locally")
         self.repo.insert_many(
             key=RedisKeys.USERS,
             entities=[
@@ -1046,7 +1047,7 @@ class OdooManager:
                     city=user["city"],
                     postcode=user["postcode"],
                     street=user["street"],
-                    user=user["ordercast_id"],
+                    ordercast_user=user["ordercast_id"],
                 )
                 for user in users_to_sync
             ],

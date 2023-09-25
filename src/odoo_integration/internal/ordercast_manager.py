@@ -40,6 +40,7 @@ from src.infrastructure import (
     CreatePickupLocationRequest,
     ListOrdersRequest,
     Employee,
+    OrdercastApiValidationException,
 )
 from .constants import ORDER_STATUSES_FOR_SYNC
 from .odoo_repo import RedisKeys, OdooRepo
@@ -63,7 +64,10 @@ class OrdercastManager:
         ]
 
     def upsert_users(self, users_to_sync: list[dict[str, Any]]) -> None:
+        # TODO cache or get from cache
         default_sector_id = self.get_sector()
+        default_price_rate = self.get_default_price_rate()
+        logger.info("Saving users to Ordercast")
         self.ordercast_api.bulk_signup(
             request=[
                 BulkSignUpRequest(
@@ -81,12 +85,12 @@ class OrdercastManager:
                         phone=user["phone"],
                         city=user["city"],
                         sector_id=user.get("sector_id", default_sector_id),
+                        price_rate_id=default_price_rate["id"],
                         postcode=user["postcode"],
                         street=user["street"],
                         vat=user["vat"],
                         website=user["website"],
                         info=user["info"],
-                        corporate_status_id=user.get("corporate_status_id", 1),
                         country_alpha_2=user.get("country_alpha_2", "GB"),
                     ),
                 )
@@ -95,26 +99,31 @@ class OrdercastManager:
         )
 
     def create_billing_address(self, user: dict[str, Any]) -> None:
-        for billing_address in user["odoo_data"]["billing_addresses"]:
-            self.ordercast_api.create_billing_address(
-                CreateBillingAddressRequest(
-                    merchant_id=user["ordercast_id"],
-                    name=billing_address["name"],
-                    street=billing_address["address_one"],
-                    city=billing_address["city"],
-                    postcode=billing_address["postal_code"],
-                    country=billing_address["country"],
-                    contact_name=billing_address["name"],
-                    contact_phone=billing_address["phone"],
-                    corporate_status_name=billing_address["name"],
-                    vat=user["vat"],
+        logger.info("Creating billing address")
+        try:
+            for billing_address in user["odoo_data"]["billing_addresses"]:
+                self.ordercast_api.create_billing_address(
+                    CreateBillingAddressRequest(
+                        merchant_id=user["ordercast_id"],
+                        name=billing_address["name"],
+                        street=billing_address["address_one"],
+                        city=billing_address["city"],
+                        postcode=billing_address["postal_code"],
+                        country=billing_address["country"],
+                        contact_name=billing_address["name"],
+                        contact_phone=billing_address.get("phone", "3281000000"),
+                        corporate_status_name=billing_address["name"],
+                        vat=user["vat"],
+                    )
                 )
-            )
+        except OrdercastApiValidationException as e:
+            logger.error(f"Error during billing address creation => {e}, skipping")
 
     def create_shipping_address(
         self,
         user: dict[str, Any],
     ) -> None:
+        logger.info("Creating shipping address")
         for shipping_address in user["odoo_data"]["shipping_addresses"]:
             self.ordercast_api.create_shipping_address(
                 CreateShippingAddressRequest(
@@ -203,7 +212,7 @@ class OrdercastManager:
         logger.info("Creating a Default Odoo price rate")
         default_odoo_price_rate = "Default Odoo Price Rate"
         self.ordercast_api.upsert_price_rate(
-            request=UpsertPriceRatesRequest(name=default_odoo_price_rate)
+            request=[UpsertPriceRatesRequest(name=default_odoo_price_rate)]
         )
         logger.info("Created a Default Odoo price rate")
 

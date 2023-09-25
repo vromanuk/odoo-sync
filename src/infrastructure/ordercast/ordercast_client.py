@@ -255,10 +255,10 @@ class OrdercastApi:
         )
 
     @error_handler
-    def upsert_price_rate(self, request: UpsertPriceRatesRequest) -> Response:
+    def upsert_price_rate(self, request: list[UpsertPriceRatesRequest]) -> Response:
         return httpx.post(
-            url=f"{self.base_url}/price-rate",
-            json=request.model_dump(),
+            url=f"{self.base_url}/price-rate/",
+            json=[m.model_dump() for m in request],
             headers=self._auth_headers,
         )
 

@@ -1,3 +1,4 @@
+import copy
 from datetime import datetime
 from typing import Any, Annotated, Optional
 
@@ -96,7 +97,13 @@ class OdooSyncManager:
         logger.info(
             f"Received merchants => {len(users_to_sync)}, started syncing with Odoo."
         )
-        self.odoo_manager.sync_users(users_to_sync)
+        self.odoo_manager.sync_users(
+            [
+                u
+                for u in users_to_sync
+                if u.erp_id not in self.repo.get_all(RedisKeys.USERS)
+            ]
+        )
 
     def sync_billing(self, users_to_sync: list[dict[str, Any]]) -> None:
         for partner in users_to_sync:
@@ -325,13 +332,15 @@ class OdooSyncManager:
     def set_ordercast_id(
         self, users_to_sync: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        users_with_ordercast_id = users_to_sync.copy()
+        users_with_ordercast_id = copy.deepcopy(users_to_sync)
 
         user_mapper = {u["erp_id"]: u for u in users_with_ordercast_id}
         synced_users = self.ordercast_manager.get_users()
 
         for synced_user in synced_users:
-            if user := user_mapper.get(synced_user.erp_id):
+            if synced_user.erp_id and (
+                user := user_mapper.get(int(synced_user.erp_id))
+            ):
                 user["ordercast_id"] = synced_user.id
 
         return users_with_ordercast_id

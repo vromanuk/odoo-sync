@@ -23,6 +23,7 @@ from .ordercast_api_requests import (
     Employee,
 )
 from .ordercast_client import OrdercastApi, get_ordercast_api
+from .exceptions import OrdercastApiValidationException
 
 __all__ = (
     "OrdercastApi",
@@ -49,4 +50,5 @@ __all__ = (
     "CreatePickupLocationRequest",
     "ListOrdersRequest",
     "Employee",
+    "OrdercastApiValidationException",
 )

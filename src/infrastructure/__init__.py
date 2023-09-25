@@ -24,6 +24,7 @@ from .ordercast import (
     OrdercastApi,
     get_ordercast_api,
     Employee,
+    OrdercastApiValidationException,
 )
 from .redis_client import RedisClient, get_redis_client
 
@@ -56,4 +57,5 @@ __all__ = (
     "CreatePickupLocationRequest",
     "ListOrdersRequest",
     "Employee",
+    "OrdercastApiValidationException",
 )

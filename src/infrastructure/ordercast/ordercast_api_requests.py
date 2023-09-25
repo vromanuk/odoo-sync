@@ -30,12 +30,12 @@ class Merchant(BaseModel):
     phone: str
     city: str
     sector_id: PositiveInt
-    postcode: str
-    street: str
+    price_rate_id: PositiveInt
+    postcode: str = ""
+    street: str = ""
     vat: str = ""
     website: str = ""
     info: str = ""
-    corporate_status_id: int = 1
     country_alpha_2: str = "GB"
 
 
