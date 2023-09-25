@@ -98,13 +98,7 @@ class OdooSyncManager:
         logger.info(
             f"Received merchants => {len(users_to_sync)}, started syncing with Odoo."
         )
-        self.odoo_manager.sync_users(
-            [
-                u
-                for u in users_to_sync
-                if u.erp_id not in self.repo.get_all(RedisKeys.USERS)
-            ]
-        )
+        self.odoo_manager.sync_users(users_to_sync)
 
     def sync_billing(self, users_to_sync: list[dict[str, Any]]) -> None:
         for partner in users_to_sync:
@@ -174,7 +168,6 @@ class OdooSyncManager:
         )
         products = self.odoo_manager.get_products(last_sync_date)
 
-        logger.info("Connected to Odoo")
         logger.info(
             f"Received {len(products['objects']) if has_objects(products) else 0} "
             f"products, start saving them."

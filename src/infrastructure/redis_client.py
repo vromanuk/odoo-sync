@@ -66,6 +66,14 @@ class RedisClient:
     def length(self, key: str) -> Awaitable[int] | int:
         return self._client.scard(key)
 
+    def get_unique(self, compare_to: str, comparable: str, entities: list[int]) -> Any:
+        pipeline = self._client.pipeline()
+        pipeline.sadd(comparable, *entities)
+        pipeline.sdiff(comparable, compare_to)
+        unique = pipeline.execute()
+        self._client.unlink(comparable)
+        return unique
+
 
 def get_redis_client(
     settings: Annotated[Settings, Depends(get_settings)]

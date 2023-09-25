@@ -22,6 +22,7 @@ from src.infrastructure import RedisClient, get_redis_client
 
 class RedisKeys(str, enum.Enum):
     USERS = "users"
+    SYNC_ORDERCAST_USERS = "sync_ordercast_users"
     ADDRESSES = "addresses"
     PRODUCTS = "products"
     ATTRIBUTES = "attributes"
@@ -141,6 +142,17 @@ class OdooRepo:
         entity_schema = self._schema[key]
         entity_key = entity_schema["key"]
         return self._client.length(entity_key)
+
+    def get_unique(
+        self, compare_to: RedisKeys, comparable: RedisKeys, entities: list[Any]
+    ) -> Any:
+        entity_schema = self._schema[compare_to]
+        compare_to_key = entity_schema["key"]
+        return self._client.get_unique(
+            compare_to=compare_to_key,
+            comparable=f"{self._prefix}:{comparable}",
+            entities=entities,
+        )
 
 
 def get_odoo_repo(

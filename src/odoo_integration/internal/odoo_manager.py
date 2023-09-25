@@ -135,7 +135,19 @@ class OdooManager:
             for partner in partners
         ]
 
+    def get_unique_users(
+        self, users: list[OrdercastFlatMerchant]
+    ) -> list[OrdercastFlatMerchant]:
+        logger.info("Getting unique users to sync with Odoo")
+        _, unique_users = self.repo.get_unique(
+            compare_to=RedisKeys.USERS,
+            comparable=RedisKeys.SYNC_ORDERCAST_USERS,
+            entities=[u.erp_id for u in users],
+        )
+        return [u for u in users if u.erp_id in unique_users]
+
     def sync_users(self, users: list[OrdercastFlatMerchant]) -> None:
+        users = self.get_unique_users(users)
         remote_users_obj = self._client["res.partner"]
         remote_supported_langs = self._client.get_odoo_entities("res.lang")
         for user in users:
