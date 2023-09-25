@@ -316,7 +316,11 @@ class OdooSyncManager:
             f"Received {len(orders) if orders else 0} orders, start saving them."
         )
         if orders:
-            self.ordercast_manager.sync_orders(orders)
+            self.ordercast_manager.sync_orders(
+                orders=orders,
+                default_price_rate=self.repo.get_key(RedisKeys.DEFAULT_PRICE_RATE),
+            )
+            self.odoo_manager.save_orders(orders)
 
     def set_ordercast_id(
         self, users_to_sync: list[dict[str, Any]]

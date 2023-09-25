@@ -23,7 +23,6 @@ from src.data import (
     OrdercastFlatMerchant,
 )
 from src.infrastructure import OdooClient, get_odoo_client
-from .exceptions import OdooSyncException
 from .helpers import (
     is_empty,
     is_not_empty,
@@ -386,7 +385,7 @@ class OdooManager:
         from_date: Optional[datetime] = None,
         i18n_fields: list[str] = None,
         filter_criteria: Any = None,
-        remote_ids: Optional[list] = None,
+        remote_ids: Optional[list[int]] = None,
     ) -> Any:
         api_filter_criteria = []
         if filter_criteria and isinstance(filter_criteria, list):
@@ -442,6 +441,7 @@ class OdooManager:
                             )
                         )
                 return result_ids
+            return []
 
         product_variants_names = get_entity_name_as_i18n(
             product_variants, prefix="display_name_"
@@ -896,11 +896,11 @@ class OdooManager:
         orders_invoice_attach_pending: list[int],
         from_date: Optional[datetime] = None,
     ) -> list[dict[str, Any]]:
-        if not self.repo.get_len(RedisKeys.ORDERS):
-            logger.info(
-                "There are no order were send to Odoo" "seems no orders created yet."
-            )
-            return []
+        # if not self.repo.get_len(RedisKeys.ORDERS):
+        #     logger.info(
+        #         "There are no order were send to Odoo" "seems no orders created yet."
+        #     )
+        #     return []
 
         synced_orders = self.repo.get_all(RedisKeys.ORDERS)
         odoo_orders = self.get_remote_updated_objects("sale.order")
@@ -1010,12 +1010,13 @@ class OdooManager:
                                 order_line_dto["product_id"] = product.id
                                 order_line_dto["name"] = product.name
                             else:
-                                msg = f"""
-                                Odoo product for remote_id = {product_id} not found. 
-                                Please sync products first to make this working properly
-                                """
-                                logger.error(msg)
-                                raise OdooSyncException(msg)
+                                pass
+                                # msg = f"""
+                                # Odoo product for remote_id = {product_id} not found.
+                                # Please sync products first to make this working properly
+                                # """
+                                # logger.error(msg)
+                                # raise OdooSyncException(msg)
                             order_line_dto["_remote_product_id"] = product_id  # not id
                         else:
                             logger.warn(
@@ -1135,6 +1136,21 @@ class OdooManager:
             and order.odoo_order_status
             not in [OrderStatus.PROCESSED_STATUS, OrderStatus.PENDING_PAYMENT_STATUS]
         ]
+
+    def save_orders(self, orders: list[dict[str, Any]]) -> None:
+        self.repo.insert_many(
+            key=RedisKeys.ORDERS,
+            entities=[
+                OdooOrder(
+                    odoo_id=order["odoo_id"],
+                    order=order["order"],
+                    sync_date=datetime.now(timezone.utc),
+                    odoo_order_status=order["odoo_order_status"],
+                    odoo_invoice_status=order["odoo_invoice_status"],
+                )
+                for order in orders
+            ],
+        )
 
 
 def get_odoo_provider(

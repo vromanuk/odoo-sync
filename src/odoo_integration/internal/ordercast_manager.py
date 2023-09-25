@@ -1,13 +1,11 @@
-from datetime import datetime, timezone
+import base64
+from datetime import datetime
 from typing import Annotated, Any, Optional
 
 import structlog
 from fastapi import Depends
 
 from src.data import (
-    OdooOrder,
-    InvoiceStatus,
-    OrderStatus,
     Locale,
     OrdercastFlatMerchant,
     OrdercastProduct,
@@ -436,131 +434,27 @@ class OrdercastManager:
 
         return result
 
-    def sync_orders(self, orders: list[dict[str, Any]]) -> None:
+    def sync_orders(
+        self, orders: list[dict[str, Any]], default_price_rate: dict[str, Any]
+    ) -> None:
         for order in orders:
-            odoo_order = odoo_repo.get(key=RedisKeys.ORDERS, entity_id=order["id"])
-            if odoo_order:
-                odoo_order.odoo_order_status = order["status"]
-                odoo_order.odoo_invoice_status = order["invoice_status"]
+            ordercast_order_id = self.ordercast_api.create_order(
+                CreateOrderRequest(
+                    order_status_enum=order["status"],
+                    merchant_id=None,
+                    price_rate_id=default_price_rate["id"],
+                    external_id=order["id"],
+                )
+            )
 
-                existing_order = odoo_order.order
-                if "invoice_file_data" in order:
-                    # self.save_file(order['invoice_file_name'], order['invoice_file_data'], existing_order.invoice)
-                    logger.info(
-                        f"Invoice file {order['invoice_file_name']} "
-                        f"added for order {existing_order.id}."
-                    )
-                elif existing_order.invoice:
-                    logger.info(
-                        f"""
-                        Invoice file {existing_order.invoice.url.split('/')[-1]
-                        if existing_order.invoice and existing_order.invoice.url else ''} 
-                        removed from order {existing_order.id}.
-                        """
-                    )
-                    # self.delete_file(existing_order.invoice)
-
-                if "note" in order:
-                    existing_order.note = order["note"]
-
-                odoo_repo.insert(
-                    key=RedisKeys.ORDERS,
-                    entity=OdooOrder(
-                        odoo_id=existing_order.odoo_id,
-                        order=existing_order.order,
-                        sync_date=datetime.now(timezone.utc),
-                        odoo_order_status=existing_order.odoo_order_status,
-                        odoo_invoice_status=existing_order.odoo_invoice_status,
-                    ),
+            # TODO: run in a different process
+            if file_content := order.get("invoice_file_data"):
+                self.ordercast_api.attach_invoice(
+                    order_id=ordercast_order_id,
+                    filename=order["invoice_file_name"],
+                    file_content=base64.b64decode(file_content),
                 )
-
-                self.ordercast_api.create_order(
-                    CreateOrderRequest(
-                        order_status_enum=existing_order.odoo_order_status,
-                        merchant_id=None,
-                        price_rate_id=None,
-                        external_id=existing_order.odoo_id,
-                    )
-                )
-                self.update_order_status(existing_order, odoo_order, order)
-            else:
-                logger.error(
-                    f"Address with remote_id={order['id']} "
-                    f"not exists in the system, please run sync task first."
-                )
-
-    def update_order_status(self, existing_order, external_order, order):
-        # TODO: fix
-        try:
-            if (
-                external_order.odoo_invoice_status == InvoiceStatus.INV_INVOICED_STATUS
-                and existing_order.status
-                not in [
-                    OrderStatus.PROCESSED_STATUS,
-                    OrderStatus.PENDING_PAYMENT_STATUS,
-                    OrderStatus.CANCELLED_BY_ADMIN_STATUS,
-                ]
-            ):
-                logger.info(
-                    f"""
-                    Order '{order['name']}' has Odoo oder status: 
-                    '{external_order.odoo_order_status}' and 
-                    invoice status: '{external_order.odoo_invoice_status}', 
-                    updating to 'Processed'.
-                    """
-                )
-                if existing_order.invoice:
-                    url = utils.get_invoice_full_url(existing_order.invoice)
-                    existing_order.processed(url)
-                else:
-                    logger.warn(
-                        f"Order '{order['name']}' has no invoice file, "
-                        f"so changing status to 'Processed' ignored."
-                    )
-            elif (
-                external_order.odoo_order_status == OrderStatus.DONE_STATUS
-                and existing_order.status != OrderStatus.COMPLETED_STATUS
-            ):
-                logger.info(
-                    f"""
-                    Order '{order['name']}' has Odoo oder status:
-                    '{external_order.odoo_order_status}' and 
-                    invoice status: '{external_order.odoo_invoice_status}',
-                    updating to 'Completed'.
-                    """
-                )
-                existing_order.complete()
-            elif (
-                external_order.odoo_order_status == OrderStatus.CANCEL_STATUS
-                and existing_order.status != OrderStatus.CANCELLED_BY_ADMIN_STATUS
-            ):
-                logger.info(
-                    f"""
-                    Order '{order['name']}' has Odoo oder status:
-                    '{external_order.odoo_order_status}' and 
-                    invoice status: '{external_order.odoo_invoice_status}',
-                    updating to 'Cancelled'.
-                    """
-                )
-                if existing_order.status in [
-                    OrderStatus.SUBMITTED_STATUS,
-                    OrderStatus.IN_PROGRESS_STATUS,
-                ]:
-                    existing_order.cancel(existing_order.operator)
-                else:
-                    logger.warn(
-                        f"""
-                        Order {order['name']} can not be cancelled, 
-                        since it has '{existing_order.status}' status
-                        and only orders with {OrderStatus.SUBMITTED_STATUS}
-                        or {OrderStatus.IN_PROGRESS_STATUS}'
-                        statuses permitted to cancel.
-                        """
-                    )
-            existing_order.save()
-        except Exception as exc:
-            logger.error("Error during updating order status locally.")
-            raise exc
+                logger.info(f"Invoice file attached to order {ordercast_order_id}")
 
     def get_users_with_related_entities(self) -> list[OrdercastFlatMerchant]:
         users = self.get_users()

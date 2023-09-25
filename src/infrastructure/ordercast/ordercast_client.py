@@ -299,6 +299,16 @@ class OrdercastApi:
             headers=self._auth_headers,
         )
 
+    @error_handler
+    def attach_invoice(
+        self, order_id: int, filename: str, file_content: bytes
+    ) -> Response:
+        return httpx.post(
+            url=f"{self.base_url}/order/{order_id}/invoice",
+            headers=self._auth_headers,
+            files={"file": filename, "content": file_content},
+        )
+
 
 def get_ordercast_api(
     settings: Annotated[Settings, Depends(get_settings)]
