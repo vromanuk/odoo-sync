@@ -23,6 +23,7 @@ from .ordercast import (
     ListOrdersRequest,
     OrdercastApi,
     get_ordercast_api,
+    Employee,
 )
 from .redis_client import RedisClient, get_redis_client
 
@@ -54,4 +55,5 @@ __all__ = (
     "AddDeliveryMethodRequest",
     "CreatePickupLocationRequest",
     "ListOrdersRequest",
+    "Employee",
 )

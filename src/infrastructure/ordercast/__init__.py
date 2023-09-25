@@ -20,6 +20,7 @@ from .ordercast_api_requests import (
     AddDeliveryMethodRequest,
     CreatePickupLocationRequest,
     ListOrdersRequest,
+    Employee,
 )
 from .ordercast_client import OrdercastApi, get_ordercast_api
 
@@ -47,4 +48,5 @@ __all__ = (
     "AddDeliveryMethodRequest",
     "CreatePickupLocationRequest",
     "ListOrdersRequest",
+    "Employee",
 )

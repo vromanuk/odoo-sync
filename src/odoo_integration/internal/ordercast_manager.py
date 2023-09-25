@@ -41,6 +41,7 @@ from src.infrastructure import (
     AddDeliveryMethodRequest,
     CreatePickupLocationRequest,
     ListOrdersRequest,
+    Employee,
 )
 from .constants import ORDER_STATUSES_FOR_SYNC
 from .odoo_repo import RedisKeys, OdooRepo
@@ -66,8 +67,16 @@ class OrdercastManager:
     def upsert_users(self, users_to_sync: list[dict[str, Any]]) -> None:
         default_sector_id = self.get_sector()
         self.ordercast_api.bulk_signup(
-            [
+            request=[
                 BulkSignUpRequest(
+                    employee=Employee(
+                        email=user["email"],
+                        first_name=user["name"],
+                        last_name=user["name"],
+                        phone=user["phone"],
+                        password=user["password"],
+                        language=user["language"],
+                    ),
                     merchant=Merchant(
                         erp_id=user["erp_id"],
                         name=user["name"],
@@ -81,7 +90,7 @@ class OrdercastManager:
                         info=user["info"],
                         corporate_status_id=user.get("corporate_status_id", 1),
                         country_alpha_2=user.get("country_alpha_2", "GB"),
-                    )
+                    ),
                 )
                 for user in users_to_sync
             ]

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, Any
 
-from pydantic import BaseModel, PositiveInt, model_serializer
+from pydantic import BaseModel, PositiveInt, model_serializer, EmailStr
 
 
 class ImageObject(BaseModel):
@@ -39,7 +39,17 @@ class Merchant(BaseModel):
     country_alpha_2: str = "GB"
 
 
+class Employee(BaseModel):
+    email: EmailStr
+    first_name: str
+    last_name: str
+    phone: str
+    password: str
+    language: str
+
+
 class BulkSignUpRequest(BaseModel):
+    employee: Employee
     merchant: Merchant
 
 
