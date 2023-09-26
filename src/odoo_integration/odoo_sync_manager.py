@@ -5,7 +5,7 @@ from typing import Any, Annotated, Optional
 import structlog
 from fastapi import Depends
 
-from src.commons import set_context_value
+from src.commons import set_context_value, get_ctx
 from .internal.builders import (
     get_partner_data,
     get_attribute_data,
@@ -315,6 +315,7 @@ class OdooSyncManager:
     def set_ordercast_id(
         self, users_to_sync: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
+        ctx = get_ctx()
         users_with_ordercast_id = copy.deepcopy(users_to_sync)
 
         user_mapper = {u["erp_id"]: u for u in users_with_ordercast_id}
@@ -325,6 +326,7 @@ class OdooSyncManager:
                 user := user_mapper.get(int(synced_user.erp_id))
             ):
                 user["ordercast_id"] = synced_user.id
+        ctx["commons"]["user_mapper"] = user_mapper
 
         return users_with_ordercast_id
 

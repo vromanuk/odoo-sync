@@ -446,17 +446,17 @@ class OrdercastManager:
     def sync_orders(
         self, orders: list[dict[str, Any]], default_price_rate: dict[str, Any]
     ) -> None:
+        ctx = get_ctx()
         for order in orders:
             ordercast_order_id = self.ordercast_api.create_order(
                 CreateOrderRequest(
                     order_status_enum=order["status"],
-                    merchant_id=None,
+                    merchant_id=ctx["commons"]["user_mapper"][order["partner_id"]],
                     price_rate_id=default_price_rate["id"],
                     external_id=order["id"],
                 )
             )
 
-            # TODO: run in a different process
             if file_content := order.get("invoice_file_data"):
                 self.ordercast_api.attach_invoice(
                     order_id=ordercast_order_id,
