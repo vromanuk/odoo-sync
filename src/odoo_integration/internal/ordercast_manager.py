@@ -165,7 +165,7 @@ class OrdercastManager:
             )
         )
 
-    def get_sector(self) -> id:
+    def get_sector(self) -> int:
         response = self.ordercast_api.list_sectors()
         sectors = response.json()
 

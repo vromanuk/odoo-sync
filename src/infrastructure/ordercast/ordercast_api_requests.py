@@ -129,7 +129,7 @@ class CreateBillingAddressRequest(BaseModel):
 
 
 class UpsertProductsRequest(BaseModel):
-    image: Optional[ImageObject] = {}
+    image: ImageObject | dict[str, Any] = {}
     name: dict[str, str]
     sku: str
     catalogs: list[dict[str, PositiveInt]]
@@ -141,7 +141,7 @@ class UpsertCategoriesRequest(BaseModel):
     parent_id: Optional[PositiveInt] = None
     parent_code: Optional[str]
     index: PositiveInt
-    image: Optional[ImageObject] = {}
+    image: ImageObject | dict[str, Any] = {}
     code: str = ""
 
 
@@ -179,7 +179,7 @@ class UpsertProductVariantsRequest(BaseModel):
     is_bundle: bool = False
     is_editable_quantity: bool = True
     is_visible_price_net: bool = True
-    images: Optional[list[ImageObject]] = []
+    images: list[ImageObject] = []
 
 
 class UpsertPriceRatesRequest(BaseModel):
@@ -209,4 +209,4 @@ class CreatePickupLocationRequest(BaseModel):
     country: str = "UNITED_KINGDOM"
     contact_name: str = "John Doe"
     contact_phone: str = "+3281000000"
-    image: ImageObject = {}
+    image: ImageObject | dict[str, Any] = {}

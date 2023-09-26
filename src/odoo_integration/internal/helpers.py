@@ -7,11 +7,11 @@ import regex as regexp
 from .constants import SUPPORTED_LANGUAGES
 
 
-def is_not_empty(values_dict, key):
+def is_not_empty(values_dict: dict[str, Any], key: str) -> bool:
     return not is_empty(values_dict, key)
 
 
-def is_empty(values_dict, key):
+def is_empty(values_dict: dict[str, Any], key: str) -> bool:
     return (
         key not in values_dict
         or not values_dict[key]
@@ -19,7 +19,9 @@ def is_empty(values_dict, key):
     )
 
 
-def is_unique_by(unique_values, dict_object, key):
+def is_unique_by(
+    unique_values: set[Any], dict_object: dict[str, Any], key: str
+) -> bool:
     if key in dict_object and dict_object[key]:
         key_value = dict_object[key]
         if key_value in unique_values:

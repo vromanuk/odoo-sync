@@ -710,7 +710,7 @@ class OdooManager:
         }
 
     def receive_pickup_locations(self, partners: list[OdooUser]) -> dict[str, Any]:
-        partner_mapper = {p.id: p for p in partners}
+        partner_mapper = {p.odoo_id: p for p in partners}
         warehouses = self._client.get_odoo_entities(
             "stock.warehouse", i18n_fields=["name"]
         )
