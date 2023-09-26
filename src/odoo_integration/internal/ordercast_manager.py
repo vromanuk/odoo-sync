@@ -5,6 +5,7 @@ from typing import Annotated, Any, Optional
 import structlog
 from fastapi import Depends
 
+from src.commons import get_ctx
 from src.data import (
     Locale,
     OrdercastFlatMerchant,
@@ -43,8 +44,8 @@ from src.infrastructure import (
     OrdercastApiValidationException,
 )
 from .constants import ORDER_STATUSES_FOR_SYNC
+from .helpers import slugify
 from .odoo_repo import RedisKeys, OdooRepo
-from ...commons import get_ctx
 
 logger = structlog.getLogger(__name__)
 
@@ -250,7 +251,7 @@ class OrdercastManager:
                     name=category["names"],
                     parent_code=category["parent_code"],
                     index=category.get("index", 1),
-                    code=category.get("code", ""),
+                    code=slugify(category["name"]),
                 )
                 for category in categories
             ]
@@ -260,8 +261,8 @@ class OrdercastManager:
         self.ordercast_api.upsert_attributes(
             request=[
                 UpsertAttributesRequest(
-                    code=str(attribute["id"]), name=attribute["name"]
-                )  # TODO: fix code
+                    code=slugify(attribute["name"]), name=attribute["names"]
+                )
                 for attribute in attributes_to_sync
             ]
         )

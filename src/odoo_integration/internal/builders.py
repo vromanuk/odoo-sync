@@ -2,7 +2,7 @@ import secrets
 from typing import Any
 
 from src.data import UserStatus, OrdercastProduct, OrdercastAttribute, OrdercastCategory
-from .helpers import is_empty, get_i18n_field_as_dict
+from .helpers import is_empty, get_i18n_field_as_dict, get_entity_name_as_i18n
 
 
 def get_partner_data(partner: dict[str, Any]) -> dict[str, Any]:
@@ -47,6 +47,7 @@ def get_attribute_data(attribute: dict[str, Any]) -> dict[str, Any]:
         "name": attribute["name"],
         **({"position": attribute["position"]} if "position" in attribute else {}),
         **get_i18n_field_as_dict(attribute, "name"),
+        "names": get_entity_name_as_i18n([attribute])[attribute["id"]],
     }
 
 

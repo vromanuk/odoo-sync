@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import Any, Optional
 
 import regex as regexp
+import unicodedata
 
 from .constants import SUPPORTED_LANGUAGES
 
@@ -149,3 +150,23 @@ def get_entity_name_as_i18n(
                 entities_names[entity["id"]][locale] = v
 
     return entities_names
+
+
+def slugify(value: str) -> str:
+    """
+    Converts a string to a URL slug.
+
+    >>> slugify(" Joel is a slug ")
+    "joel-is-a-slug"
+    """
+    if not value:
+        return value
+
+    # Unicode isn't allowed
+    value = (
+        unicodedata.normalize("NFKD", str(value))
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+    value = re.sub(r"[^\w\s-]", "", value.lower())
+    return re.sub(r"[-\s]+", "-", value).strip("-_")

@@ -139,7 +139,7 @@ class OrdercastApi:
     @error_handler
     def upsert_categories(self, request: list[UpsertCategoriesRequest]) -> Response:
         return httpx.post(
-            url=f"{self.base_url}/category/",
+            url=f"{self.base_url}/category/?delete_unlisted=true",
             json=[model.model_dump() for model in request],
             headers=self._auth_headers,
         )
@@ -147,7 +147,7 @@ class OrdercastApi:
     @error_handler
     def upsert_attributes(self, request: list[UpsertAttributesRequest]) -> Response:
         return httpx.post(
-            url=f"{self.base_url}/attribute/",
+            url=f"{self.base_url}/attribute/?delete_unlisted=true",
             json=[model.model_dump() for model in request],
             headers=self._auth_headers,
         )
