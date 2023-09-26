@@ -1,8 +1,9 @@
 import secrets
 from typing import Any
 
-from src.data import UserStatus, OrdercastProduct, OrdercastAttribute, OrdercastCategory
+from src.data import UserStatus
 from .helpers import is_empty, get_i18n_field_as_dict, get_entity_name_as_i18n
+from .odoo_repo import OdooRepo, RedisKeys
 
 
 def get_partner_data(partner: dict[str, Any]) -> dict[str, Any]:
@@ -51,48 +52,20 @@ def get_attribute_data(attribute: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def get_product_data(
-    product: dict[str, Any],
-    odoo_categories: list[dict[str, Any]],
-    ordercast_categories: list[OrdercastCategory],
-) -> dict[str, Any]:
-    ordercast_category_mapper = {c.code: c.id for c in ordercast_categories}
-    category_mapper = {
-        c["id"]: ordercast_category_mapper[c["name"]]
-        for c in odoo_categories
-        if c["name"] in ordercast_categories
-    }
-
+def get_product_data(product: dict[str, Any], odoo_repo: OdooRepo) -> dict[str, Any]:
     return {
         "name": product["name"],
         "is_removed": False,
         "i18n_fields": get_i18n_field_as_dict(product, "name"),
         "names": product["names"],
-        "category": category_mapper.get(product["categ_id"][0], product["categ_id"][0]),
+        "category": odoo_repo.get(RedisKeys.CATEGORIES, product["categ_id"][0]),
         "id": product["id"],
     }
 
 
 def get_product_variant_data(
-    product_variant: dict[str, Any],
-    odoo_products: list[dict[str, Any]],
-    ordercast_products: list[OrdercastProduct],
-    odoo_attributes: list[dict[str, Any]],
-    ordercast_attributes: list[OrdercastAttribute],
+    product_variant: dict[str, Any], odoo_repo: OdooRepo
 ) -> dict[str, Any]:
-    ordercast_product_mapper = {p.sku: p.id for p in ordercast_products}
-    product_mapper = {
-        p["id"]: ordercast_product_mapper[p["name"]]
-        for p in odoo_products
-        if p["name"] in ordercast_product_mapper
-    }
-    ordercast_attribute_mapper = {a.name: a.id for a in ordercast_attributes}
-    attribute_mapper = {
-        a["id"]: ordercast_attribute_mapper[a["name"]]
-        for a in odoo_attributes
-        if a["name"] in ordercast_attribute_mapper
-    }
-
     remote_id = product_variant["id"]
 
     i18n_fields = get_i18n_field_as_dict(
@@ -103,9 +76,7 @@ def get_product_variant_data(
         "id": remote_id,
         "name": product_variant["display_name"],
         "pack": product_variant.get("unit_count", 1),
-        "product_id": product_mapper.get(
-            product_variant["group"][0], product_variant["group"][0]
-        ),
+        "product": odoo_repo.get(RedisKeys.PRODUCTS, product_variant["group"][0]),
         "unit": product_variant.get("attr_unit"),
         "barcode": product_variant.get("barcode", ""),
         "ref": product_variant["code"],
@@ -114,7 +85,8 @@ def get_product_variant_data(
         "names": product_variant["names"],
         "sku": product_variant["code"],
         "attribute_values": [
-            attribute_mapper.get(a) for a in product_variant.get("attribute_values", [])
+            odoo_repo.get(RedisKeys.ATTRIBUTES, a["id"])
+            for a in product_variant.get("attribute_values", [])
         ],
     }
     defaults.update(i18n_fields)

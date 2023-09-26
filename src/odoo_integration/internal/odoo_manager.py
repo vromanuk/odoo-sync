@@ -1065,7 +1065,7 @@ class OdooManager:
             ],
         )
 
-    def save_categories(self, categories: list[dict[str, Any]]) -> None:
+    def save_categories(self, categories_to_sync: list[dict[str, Any]]) -> None:
         self.repo.insert_many(
             key=RedisKeys.CATEGORIES,
             entities=[
@@ -1073,9 +1073,10 @@ class OdooManager:
                     odoo_id=category["id"],
                     name=category["name"],
                     category_type=CategoryType.CLASS,
+                    category=category["ordercast_id"],
                     sync_date=datetime.now(timezone.utc),
                 )
-                for category in categories
+                for category in categories_to_sync
             ],
         )
 
@@ -1086,6 +1087,7 @@ class OdooManager:
                 OdooAttribute(
                     odoo_id=attribute["id"],
                     name=attribute["name"],
+                    attribute=attribute["ordercast_id"],
                     sync_date=datetime.now(timezone.utc),
                 )
                 for attribute in attributes_to_sync

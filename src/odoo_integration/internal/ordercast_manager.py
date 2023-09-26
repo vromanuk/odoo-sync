@@ -244,7 +244,7 @@ class OrdercastManager:
             ]
         )
 
-    def save_categories(self, categories: list[dict[str, Any]]) -> None:
+    def save_categories(self, categories_to_sync: list[dict[str, Any]]) -> None:
         self.ordercast_api.upsert_categories(
             request=[
                 UpsertCategoriesRequest(
@@ -253,7 +253,7 @@ class OrdercastManager:
                     index=category.get("index", 1),
                     code=slugify(category["name"]),
                 )
-                for category in categories
+                for category in categories_to_sync
             ]
         )
 
@@ -445,14 +445,16 @@ class OrdercastManager:
         return result
 
     def sync_orders(
-        self, orders: list[dict[str, Any]], default_price_rate: dict[str, Any]
+        self,
+        orders: list[dict[str, Any]],
+        default_price_rate: dict[str, Any],
+        odoo_repo: OdooRepo,
     ) -> None:
-        ctx = get_ctx()
         for order in orders:
             ordercast_order_id = self.ordercast_api.create_order(
                 CreateOrderRequest(
                     order_status_enum=order["status"],
-                    merchant_id=ctx["commons"]["user_mapper"][order["partner_id"]],
+                    merchant_id=odoo_repo.get(RedisKeys.USERS, order["partner_id"]),
                     price_rate_id=default_price_rate["id"],
                     external_id=order["id"],
                 )

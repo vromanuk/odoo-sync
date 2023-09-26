@@ -1,11 +1,10 @@
-import copy
 from datetime import datetime
 from typing import Any, Annotated, Optional
 
 import structlog
 from fastapi import Depends
 
-from src.commons import set_context_value, get_ctx
+from src.commons import set_context_value
 from .internal.builders import (
     get_partner_data,
     get_attribute_data,
@@ -14,7 +13,7 @@ from .internal.builders import (
     get_delivery_option_data,
     get_pickup_location_data,
 )
-from .internal.helpers import has_objects
+from .internal.helpers import has_objects, set_ordercast_id, set_user_ordercast_id
 from .internal.odoo_manager import OdooManager, get_odoo_provider
 from .internal.odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
 from .internal.ordercast_manager import OrdercastManager, get_ordercast_manager
@@ -88,9 +87,11 @@ class OdooSyncManager:
             get_partner_data(partner) for partner in partners if partner["email"]
         ]
         self.ordercast_manager.upsert_users(users_to_sync=users_to_sync)
-        users_to_sync = self.set_ordercast_id(users_to_sync)
-
-        self.odoo_manager.save_users(users_to_sync=users_to_sync)
+        self.odoo_manager.save_users(
+            users_to_sync=set_user_ordercast_id(
+                users_to_sync, source=self.ordercast_manager.get_users
+            )
+        )
         self.sync_billing(users_to_sync=users_to_sync)
 
     def sync_users_from_ordercast_to_odoo(self) -> None:
@@ -106,15 +107,11 @@ class OdooSyncManager:
             self.ordercast_manager.create_shipping_address(partner)
 
     def sync_products(self, full_sync: bool = False) -> None:
-        categories = self.sync_categories_to_ordercast()
-        attributes = self.sync_attributes_to_ordercast()
-        products = self.sync_products_to_ordercast(
-            categories=categories["objects"], full_sync=full_sync
-        )
+        self.sync_categories_to_ordercast()
+        self.sync_attributes_to_ordercast()
+        self.sync_products_to_ordercast(full_sync=full_sync)
         self.sync_product_variants_to_ordercast(
             full_sync=full_sync,
-            products=products["objects"],
-            attributes=attributes["objects"],
         )
 
     def sync_categories_to_ordercast(self) -> dict[str, Any]:
@@ -127,8 +124,15 @@ class OdooSyncManager:
         )
         if categories:
             validate_categories(categories)
-            self.ordercast_manager.save_categories(categories["objects"])
-            self.odoo_manager.save_categories(categories["objects"])
+            self.ordercast_manager.save_categories(
+                categories_to_sync=categories["objects"]
+            )
+            self.odoo_manager.save_categories(
+                categories_to_sync=set_ordercast_id(
+                    items=categories["objects"],
+                    source=self.ordercast_manager.get_categories,
+                )
+            )
 
         return categories
 
@@ -156,13 +160,16 @@ class OdooSyncManager:
             self.ordercast_manager.save_attributes(
                 attributes_to_sync=attributes_to_sync
             )
-            self.odoo_manager.save_attributes(attributes_to_sync)
+            self.odoo_manager.save_attributes(
+                attributes_to_sync=set_ordercast_id(
+                    items=attributes_to_sync,
+                    source=self.ordercast_manager.get_attributes,
+                )
+            )
 
         return attributes
 
-    def sync_products_to_ordercast(
-        self, categories: list[dict[str, Any]], full_sync: bool = False
-    ) -> dict[str, Any]:
+    def sync_products_to_ordercast(self, full_sync: bool = False) -> dict[str, Any]:
         last_sync_date = (
             None if full_sync else self.repo.get_key(RedisKeys.LAST_PRODUCT_SYNC)
         )
@@ -176,14 +183,8 @@ class OdooSyncManager:
         if has_objects(products):
             validate_products(products)
 
-            ordercast_categories = self.ordercast_manager.get_categories()
-
             products_to_sync = [
-                get_product_data(
-                    product,
-                    odoo_categories=categories,
-                    ordercast_categories=ordercast_categories,
-                )
+                get_product_data(product, odoo_repo=self.repo)
                 for product in products["objects"]
             ]
 
@@ -194,8 +195,6 @@ class OdooSyncManager:
 
     def sync_product_variants_to_ordercast(
         self,
-        products: list[dict[str, Any]],
-        attributes: list[dict[str, Any]],
         full_sync: bool = False,
     ) -> None:
         last_sync_date = (
@@ -218,20 +217,14 @@ class OdooSyncManager:
                 "saving categories and attributes."
             )
 
-            units = self.odoo_manager.get_units()
-            ordercast_products = self.ordercast_manager.get_products()
-            ordercast_attributes = self.ordercast_manager.get_attributes()
             product_variants_to_sync = [
                 get_product_variant_data(
-                    product_variant=product_variant,
-                    odoo_products=products,
-                    ordercast_products=ordercast_products,
-                    odoo_attributes=attributes,
-                    ordercast_attributes=ordercast_attributes,
+                    product_variant=product_variant, odoo_repo=self.repo
                 )
                 for product_variant in product_variants["objects"]
             ]
 
+            units = self.odoo_manager.get_units()
             self.ordercast_manager.save_product_variants(
                 product_variants=product_variants_to_sync,
                 units=units,
@@ -309,26 +302,9 @@ class OdooSyncManager:
             self.ordercast_manager.sync_orders(
                 orders=orders,
                 default_price_rate=self.repo.get_key(RedisKeys.DEFAULT_PRICE_RATE),
+                odoo_repo=self.repo,
             )
             self.odoo_manager.save_orders(orders)
-
-    def set_ordercast_id(
-        self, users_to_sync: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        ctx = get_ctx()
-        users_with_ordercast_id = copy.deepcopy(users_to_sync)
-
-        user_mapper = {u["erp_id"]: u for u in users_with_ordercast_id}
-        synced_users = self.ordercast_manager.get_users()
-
-        for synced_user in synced_users:
-            if synced_user.erp_id and (
-                user := user_mapper.get(int(synced_user.erp_id))
-            ):
-                user["ordercast_id"] = synced_user.id
-        ctx["commons"]["user_mapper"] = user_mapper
-
-        return users_with_ordercast_id
 
     def load_commons(self) -> None:
         default_sector_id = self.ordercast_manager.get_sector()

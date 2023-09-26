@@ -26,7 +26,7 @@ class OdooProduct(OdooCommons):
 class OdooCategory(OdooCommons):
     name: str
     category_type: CategoryType
-    category: Optional[PositiveInt] = None
+    category: PositiveInt
 
 
 class OdooProductVariant(OdooCommons):
@@ -36,7 +36,7 @@ class OdooProductVariant(OdooCommons):
 
 class OdooAttribute(OdooCommons):
     name: str
-    attribute: Optional[PositiveInt] = None
+    attribute: PositiveInt
 
 
 class OdooOrder(OdooCommons):

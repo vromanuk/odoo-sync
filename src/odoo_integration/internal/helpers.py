@@ -1,6 +1,6 @@
 import re
 from collections import defaultdict
-from typing import Any, Optional
+from typing import Any, Optional, Callable, Iterable
 
 import regex as regexp
 import unicodedata
@@ -170,3 +170,35 @@ def slugify(value: str) -> str:
     )
     value = re.sub(r"[^\w\s-]", "", value.lower())
     return re.sub(r"[-\s]+", "-", value).strip("-_")
+
+
+def set_user_ordercast_id(
+    users_to_sync: list[dict[str, Any]], source: Callable[..., Iterable]
+) -> list[dict[str, Any]]:
+    result = []
+
+    user_mapper = {u["erp_id"]: u for u in users_to_sync}
+    synced_users = source()
+
+    for synced_user in synced_users:
+        if synced_user.erp_id and (user := user_mapper.get(int(synced_user.erp_id))):
+            user["ordercast_id"] = synced_user.id
+            result.append(user)
+
+    return result
+
+
+def set_ordercast_id(
+    items: list[dict[str, Any]], source: Callable[..., Iterable]
+) -> list[dict[str, Any]]:
+    result = []
+
+    mapper = {slugify(i["name"]): i for i in items}
+    synced = source()
+
+    for item in synced:
+        if item := mapper.get(item.code):
+            item["ordercast_id"] = item.id
+            result.append(item)
+
+    return result
