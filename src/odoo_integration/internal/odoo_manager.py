@@ -147,6 +147,8 @@ class OdooManager:
         return [u for u in users if u.erp_id in unique_users]
 
     def sync_users(self, users: list[OrdercastFlatMerchant]) -> None:
+        if not users:
+            return
         users = self.get_unique_users(users)
         remote_users_obj = self._client["res.partner"]
         remote_supported_langs = self._client.get_odoo_entities("res.lang")

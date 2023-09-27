@@ -91,12 +91,12 @@ class OdooSyncManager:
             get_partner_data(partner) for partner in partners if partner["email"]
         ]
         self.ordercast_manager.upsert_users(users_to_sync=users_to_sync)
-        self.odoo_manager.save_users(
-            users_to_sync=set_user_ordercast_id(
-                users_to_sync, source=self.ordercast_manager.get_users
-            )
+
+        users_with_ordercast_id = set_user_ordercast_id(
+            users_to_sync, source=self.ordercast_manager.get_users
         )
-        self.sync_billing(users_to_sync=users_to_sync)
+        self.odoo_manager.save_users(users_to_sync=users_with_ordercast_id)
+        self.sync_billing(users_to_sync=users_with_ordercast_id)
 
     def sync_users_from_ordercast_to_odoo(self) -> None:
         users_to_sync = self.ordercast_manager.get_users_with_related_entities()
