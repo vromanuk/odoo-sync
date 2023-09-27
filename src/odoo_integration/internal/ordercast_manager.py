@@ -45,8 +45,8 @@ from src.infrastructure import (
     paginated,
 )
 from .constants import ORDER_STATUSES_FOR_SYNC
-from .helpers import slugify
 from .odoo_repo import RedisKeys, OdooRepo
+from .utils import slugify
 
 logger = structlog.getLogger(__name__)
 

@@ -3,7 +3,7 @@ from typing import Any
 
 from src.data import UserStatus
 from .helpers import is_empty, get_i18n_field_as_dict, get_entity_name_as_i18n
-from .odoo_repo import OdooRepo, RedisKeys
+from ..odoo_repo import OdooRepo, RedisKeys
 
 
 def get_partner_data(partner: dict[str, Any]) -> dict[str, Any]:

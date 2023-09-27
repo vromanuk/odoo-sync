@@ -3,7 +3,11 @@ from typing import Any
 import structlog
 
 from ..exceptions import OdooSyncException
-from ..helpers import is_empty, is_unique_by, is_length_not_in_range
+from ..utils import (
+    is_empty,
+    is_unique_by,
+    is_length_not_in_range,
+)
 
 logger = structlog.getLogger(__name__)
 

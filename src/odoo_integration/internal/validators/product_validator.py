@@ -3,7 +3,7 @@ from typing import Any
 import structlog
 
 from ..exceptions import OdooSyncException
-from ..helpers import (
+from ..utils import (
     is_empty,
     get_field_with_i18n_fields,
     is_unique_by,

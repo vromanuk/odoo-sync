@@ -5,7 +5,7 @@ import structlog
 from fastapi import Depends
 
 from src.commons import set_context_value
-from .internal.builders import (
+from src.odoo_integration.internal.utils.builders import (
     get_partner_data,
     get_attribute_data,
     get_product_data,
@@ -13,11 +13,15 @@ from .internal.builders import (
     get_delivery_option_data,
     get_pickup_location_data,
 )
-from .internal.helpers import has_objects, set_ordercast_id, set_user_ordercast_id
 from .internal.odoo_manager import OdooManager, get_odoo_provider
 from .internal.odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
 from .internal.ordercast_manager import OrdercastManager, get_ordercast_manager
-from .internal.partner import validate_partners
+from .internal.utils import (
+    has_objects,
+    set_ordercast_id,
+    set_user_ordercast_id,
+    validate_partners,
+)
 from .internal.validators import (
     validate_products,
     validate_categories,

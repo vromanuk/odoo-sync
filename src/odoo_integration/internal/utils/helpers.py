@@ -5,7 +5,7 @@ from typing import Any, Optional, Callable, Iterable
 import regex as regexp
 import unicodedata
 
-from .constants import SUPPORTED_LANGUAGES
+from ..constants import SUPPORTED_LANGUAGES
 
 
 def is_not_empty(values_dict: dict[str, Any], key: str) -> bool:

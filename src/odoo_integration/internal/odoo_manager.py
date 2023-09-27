@@ -23,7 +23,7 @@ from src.data import (
     OrdercastFlatMerchant,
 )
 from src.infrastructure import OdooClient, get_odoo_client
-from .helpers import (
+from src.odoo_integration.internal.utils.helpers import (
     is_empty,
     is_not_empty,
     get_i18n_field_as_dict,
@@ -31,7 +31,7 @@ from .helpers import (
     get_entity_name_as_i18n,
 )
 from .odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
-from .partner import Partner
+from .utils import Partner
 
 logger = structlog.getLogger(__name__)
 

@@ -4,8 +4,8 @@ import structlog
 
 from src.data import OrdercastFlatMerchant
 from src.infrastructure import OdooClient
-from .exceptions import OdooSyncException
 from .helpers import is_not_empty, is_empty, is_unique_by, is_length_not_in_range
+from ..exceptions import OdooSyncException
 
 logger = structlog.getLogger(__name__)
 
