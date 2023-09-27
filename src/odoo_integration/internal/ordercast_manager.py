@@ -42,6 +42,7 @@ from src.infrastructure import (
     ListOrdersRequest,
     Employee,
     OrdercastApiValidationException,
+    paginated,
 )
 from .constants import ORDER_STATUSES_FOR_SYNC
 from .helpers import slugify
@@ -55,9 +56,9 @@ class OrdercastManager:
         self.ordercast_api = ordercast_api
 
     def get_users(self) -> list[OrdercastFlatMerchant]:
-        # TODO: handle pagination
-        response = self.ordercast_api.get_merchants(request=ListMerchantsRequest())
-        users = response.json()["items"]
+        users = paginated(
+            self.ordercast_api.get_merchants, request=ListMerchantsRequest()
+        )
         return [
             OrdercastFlatMerchant(
                 id=user["id"], name=user["name"], erp_id=user["erp_id"]
@@ -180,17 +181,13 @@ class OrdercastManager:
 
     def get_products(self) -> list[OrdercastProduct]:
         logger.info("Receiving products from Ordercast")
-        # TODO: handle pagination
-        response = self.ordercast_api.get_products(request=ListProductsRequest())
-        result_json = response.json()
-        if result_json:
-            return [
-                OrdercastProduct(
-                    id=product["id"], sku=product["sku"], name=product["name"]
-                )
-                for product in result_json["items"]
-            ]
-        return []
+        products = paginated(
+            self.ordercast_api.get_products, request=ListProductsRequest()
+        )
+        return [
+            OrdercastProduct(id=product["id"], sku=product["sku"], name=product["name"])
+            for product in products
+        ]
 
     def get_attributes(self) -> list[OrdercastAttribute]:
         logger.info("Receiving attributes from Ordercast")
@@ -364,17 +361,14 @@ class OrdercastManager:
 
         logger.info("Receiving orders from Ordercast")
 
-        # TODO handle pagination
-        response = self.ordercast_api.get_orders_for_sync(
+        orders = paginated(
+            self.ordercast_api.get_orders_for_sync,
             request=ListOrdersRequest(
                 statuses=status_ids, order_ids=order_ids, from_date=from_date
-            )
+            ),
         )
-        result_json = response.json()
 
-        logger.info(f"Received {len(result_json['items'])} orders to sync")
-
-        return [OrdercastFlatOrder(**order) for order in result_json["items"]]
+        return [OrdercastFlatOrder(**order) for order in orders]
 
     def get_orders_for_sync(
         self,

@@ -22,7 +22,7 @@ from .ordercast_api_requests import (
     ListOrdersRequest,
     Employee,
 )
-from .ordercast_client import OrdercastApi, get_ordercast_api
+from .ordercast_client import OrdercastApi, get_ordercast_api, paginated
 from .exceptions import OrdercastApiValidationException
 
 __all__ = (
@@ -51,4 +51,5 @@ __all__ = (
     "ListOrdersRequest",
     "Employee",
     "OrdercastApiValidationException",
+    "paginated",
 )

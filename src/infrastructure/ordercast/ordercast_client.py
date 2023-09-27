@@ -86,6 +86,33 @@ def error_handler(func: Callable[..., Response]) -> Callable[..., Response]:
     return wrapper
 
 
+@tenacity.retry(
+    wait=tenacity.wait_random(min=0.5, max=2.0),
+    stop=tenacity.stop_after_attempt(3),
+    retry=tenacity.retry_if_not_exception_type(OrdercastApiValidationException),
+)
+def paginated(source: Callable[..., Response], request: Any) -> list[Any]:
+    has_next_page = True
+    result = []
+
+    while has_next_page:
+        logger.info("Receiving paginated items...")
+        response = source(request)
+        response_json = response.json()
+
+        if not response_json:
+            break
+
+        items = response.json()["items"]
+        if len(items) == request.pageSize:
+            result.extend(items)
+            request.pageIndex += 1
+            continue
+        has_next_page = False
+
+    return result
+
+
 class OrdercastApi:
     def __init__(self, config: OrdercastConfig):
         self.base_url = config.BASE_URL
