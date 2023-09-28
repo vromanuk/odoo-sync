@@ -127,20 +127,23 @@ class OrdercastManager:
         user: dict[str, Any],
     ) -> None:
         logger.info("Creating shipping address")
-        for shipping_address in user["odoo_data"]["shipping_addresses"]:
-            self.ordercast_api.create_shipping_address(
-                CreateShippingAddressRequest(
-                    merchant_id=user["ordercast_id"],
-                    name=shipping_address["name"],
-                    street=shipping_address["address_one"],
-                    city=shipping_address["city"],
-                    postcode=shipping_address["postal_code"],
-                    country=shipping_address["country"],
-                    contact_name=shipping_address["name"],
-                    contact_phone=shipping_address["phone"],
-                    corporate_status_name=shipping_address["name"],
+        try:
+            for shipping_address in user["odoo_data"]["shipping_addresses"]:
+                self.ordercast_api.create_shipping_address(
+                    CreateShippingAddressRequest(
+                        merchant_id=user["ordercast_id"],
+                        name=shipping_address["name"],
+                        street=shipping_address["address_one"],
+                        city=shipping_address["city"],
+                        postcode=shipping_address["postal_code"],
+                        country=shipping_address["country"],
+                        contact_name=shipping_address["name"],
+                        contact_phone=shipping_address["phone"],
+                        corporate_status_name=shipping_address["name"],
+                    )
                 )
-            )
+        except OrdercastApiValidationException as e:
+            logger.error(f"Error during shipping address creation => {e}, skipping")
 
     def get_billing_addresses(self, merchant_id: int) -> list[dict[str, Any]]:
         response = self.ordercast_api.list_billing_addresses(
@@ -193,7 +196,9 @@ class OrdercastManager:
         logger.info("Receiving attributes from Ordercast")
         response = self.ordercast_api.get_attributes()
         return [
-            OrdercastAttribute(id=attribute["id"], name=attribute["name"])
+            OrdercastAttribute(
+                id=attribute["id"], name=attribute["name"], code=attribute["code"]
+            )
             for attribute in response.json()
         ]
 
@@ -227,26 +232,33 @@ class OrdercastManager:
             None,
         )
 
-    def save_products(self, products: list[dict[str, Any]]) -> None:
+    def save_products(self, products_to_sync: list[dict[str, Any]]) -> None:
         default_catalog = self.get_catalog()
         self.ordercast_api.upsert_products(
             request=[
                 UpsertProductsRequest(
                     name=product["names"],
-                    sku=product.get("sku", product["name"]),
+                    sku=product.get("sku", slugify(product["name"])),
                     catalogs=[{"catalog_id": default_catalog}],
-                    categories=[{"category_id": product["category"]}],
+                    categories=[{"category_id": product["category"].category}],
                 )
-                for product in products
+                for product in products_to_sync
+                if product.get("category")
             ]
         )
+        skipped_products = [
+            product["name"]
+            for product in products_to_sync
+            if not product.get("category")
+        ]
+        logger.warn(f"Skipped products {skipped_products} that don't have a category")
 
     def save_categories(self, categories_to_sync: list[dict[str, Any]]) -> None:
         self.ordercast_api.upsert_categories(
             request=[
                 UpsertCategoriesRequest(
                     name=category["names"],
-                    parent_code=category["parent_code"],
+                    parent_code=slugify(category["parent_code"]),
                     index=category.get("index", 1),
                     code=slugify(category["name"]),
                 )
@@ -258,7 +270,8 @@ class OrdercastManager:
         self.ordercast_api.upsert_attributes(
             request=[
                 UpsertAttributesRequest(
-                    code=slugify(attribute["name"]), name=attribute["names"]
+                    code=slugify(attribute["name"]),
+                    name=I18Name(names=attribute["names"]),
                 )
                 for attribute in attributes_to_sync
             ]
@@ -273,7 +286,9 @@ class OrdercastManager:
         logger.info(f"Inserting units from product variants => {len(units)}")
         self.ordercast_api.upsert_units(
             request=[
-                UpsertUnitsRequest(code=unit["code"], name=I18Name(names=unit["names"]))
+                UpsertUnitsRequest(
+                    code=slugify(unit["code"]), name=I18Name(names=unit["names"])
+                )
                 for unit in units
             ]
         )
@@ -283,11 +298,14 @@ class OrdercastManager:
         self.ordercast_api.upsert_product_variants(
             request=[
                 UpsertProductVariantsRequest(
-                    name=product_variant["names"],
-                    barcode=product_variant.get(
-                        "barcode", product_variant.get("ref", "")
-                    ),
-                    product_id=product_variant["product_id"],
+                    name=I18Name(names=product_variant["names"]),
+                    barcode={
+                        "code": product_variant.get(
+                            "barcode", product_variant.get("ref", "")
+                        )
+                    },
+                    product_id=product_variant["product"].product,
+                    parent_product_id=product_variant["product"].product,
                     sku=product_variant["sku"],
                     price_rates=[
                         PriceRate(
@@ -296,11 +314,10 @@ class OrdercastManager:
                             quantity=1,
                         )
                     ],
-                    unit_code=product_variant["unit_code"],
+                    unit_code=slugify(product_variant["unit"]),
                     attribute_values=[
-                        {"value_id": a.id}
+                        {"value_id": a.attribute}
                         for a in product_variant["attribute_values"]
-                        if a
                     ],
                     place_in_warehouse="",
                     customs_code="",
@@ -308,7 +325,14 @@ class OrdercastManager:
                     description=product_variant.get("description", ""),
                 )
                 for product_variant in product_variants
+                if product_variant["product"]
             ]
+        )
+        skipped_product_variants = [
+            pv["name"] for pv in product_variants if not pv["product"]
+        ]
+        logger.warn(
+            f"Skipping product variants {skipped_product_variants} without product"
         )
 
     def save_delivery_options(self, delivery_options: list[dict[str, Any]]) -> None:
@@ -320,18 +344,20 @@ class OrdercastManager:
                 )
             )
 
-    def save_pickup_locations(self, pickup_locations: list[dict[str, Any]]) -> None:
+    def save_pickup_locations(
+        self, pickup_locations_to_sync: list[dict[str, Any]]
+    ) -> None:
         logger.info("Adding pickup locations to Ordercast")
-        for pickup_location in pickup_locations:
+        for pickup_location in pickup_locations_to_sync:
             self.ordercast_api.add_pickup_location(
                 request=CreatePickupLocationRequest(
                     name=I18Name(names=pickup_location["names"]),
-                    street=pickup_location["partner"]["street"],
-                    city=pickup_location["partner"]["city"],
-                    postcode=pickup_location["partner"]["postcode"],
-                    country=pickup_location["partner"]["country"],
-                    contact_name=pickup_location["partner"]["contact_name"],
-                    contact_phone=pickup_location["partner"]["contact_phone"],
+                    street=pickup_location["partner"].street,
+                    city=pickup_location["partner"].city,
+                    postcode=pickup_location["partner"].postcode,
+                    country=pickup_location["partner"].country or "Belgium-default",
+                    contact_name=pickup_location["partner"].contact_name,
+                    contact_phone=pickup_location["partner"].contact_phone,
                 )
             )
 

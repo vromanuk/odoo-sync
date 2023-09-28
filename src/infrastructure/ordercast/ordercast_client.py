@@ -104,9 +104,10 @@ def paginated(source: Callable[..., Response], request: Any) -> list[Any]:
             break
 
         items = response.json()["items"]
+        result.extend(items)
+        request.pageIndex += 1
+
         if len(items) == request.pageSize:
-            result.extend(items)
-            request.pageIndex += 1
             continue
         has_next_page = False
 
@@ -142,7 +143,7 @@ class OrdercastApi:
         self, request: CreateShippingAddressRequest
     ) -> Response:
         return httpx.post(
-            url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping/",
+            url=f"{self.base_url}/merchant/{request.merchant_id}/address/shipping",
             json=request.model_dump(),
             headers=self._auth_headers,
         )
@@ -174,7 +175,7 @@ class OrdercastApi:
     @error_handler
     def upsert_attributes(self, request: list[UpsertAttributesRequest]) -> Response:
         return httpx.post(
-            url=f"{self.base_url}/attribute/?delete_unlisted=true",
+            url=f"{self.base_url}/attribute/",
             json=[model.model_dump() for model in request],
             headers=self._auth_headers,
         )
@@ -307,7 +308,7 @@ class OrdercastApi:
     @error_handler
     def add_pickup_location(self, request: CreatePickupLocationRequest) -> Response:
         return httpx.post(
-            url=f"{self.base_url}/company/pickup-location/",
+            url=f"{self.base_url}/company/pickup-location",
             json=request.model_dump(),
             headers=self._auth_headers,
         )

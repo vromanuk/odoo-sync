@@ -192,8 +192,14 @@ class OdooSyncManager:
                 for product in products["objects"]
             ]
 
-            self.ordercast_manager.save_products(products_to_sync)
-            self.odoo_manager.save_products(products_to_sync)
+            self.ordercast_manager.save_products(products_to_sync=products_to_sync)
+            self.odoo_manager.save_products(
+                products_to_sync=set_ordercast_id(
+                    items=products_to_sync,
+                    source=self.ordercast_manager.get_products,
+                    key="sku",
+                )
+            )
 
         return products
 
@@ -210,15 +216,19 @@ class OdooSyncManager:
         has_product_variants = has_objects(product_variants)
 
         logger.info(
-            f"Received {len(product_variants['objects']) if has_product_variants else 0}"
-            f"products variants."
+            f"""
+            Received {len(product_variants['objects']) if has_product_variants else 0}
+            products variants.
+            """
         )
 
         if has_product_variants:
             validate_product_variants(product_variants["objects"])
             logger.info(
-                "Starting saving product variants after"
-                "saving categories and attributes."
+                """
+                Starting saving product variants after
+                saving categories and attributes.
+                """
             )
 
             product_variants_to_sync = [
@@ -238,8 +248,9 @@ class OdooSyncManager:
     def sync_delivery_methods_and_pickup_locations(self) -> None:
         delivery_options = self.odoo_manager.receive_delivery_options()
         logger.info(
-            f"Received {len(delivery_options['objects']) if has_objects(delivery_options) else 0}"
-            f"delivery options, start saving them."
+            f"""
+Received {len(delivery_options['objects']) if has_objects(delivery_options) else 0} 
+delivery options, start saving them."""
         )
         if delivery_options:
             validate_delivery_options(delivery_options)
@@ -266,11 +277,12 @@ class OdooSyncManager:
             # self.repo.remove(to_delete)
 
         pickup_locations = self.odoo_manager.receive_pickup_locations(
-            partners=self.repo.get_list(RedisKeys.USERS)
+            odoo_repo=self.repo
         )
         logger.info(
-            f"Received {len(pickup_locations['objects']) if has_objects(pickup_locations) else 0}"
-            f"warehouses, start saving them."
+            f"""
+Received {len(pickup_locations['objects']) if has_objects(pickup_locations) else 0}
+warehouses, start saving them."""
         )
         if pickup_locations:
             validate_pickup_locations(pickup_locations)
@@ -280,8 +292,12 @@ class OdooSyncManager:
                 for pickup_location in pickup_locations["objects"]
             ]
 
-            self.ordercast_manager.save_pickup_locations(pickup_locations_to_sync)
-            self.odoo_manager.save_pickup_locations(pickup_locations_to_sync)
+            self.ordercast_manager.save_pickup_locations(
+                pickup_locations_to_sync=pickup_locations_to_sync
+            )
+            self.odoo_manager.save_pickup_locations(
+                pickup_locations_to_sync=pickup_locations_to_sync
+            )
 
     def sync_orders_with_odoo(
         self,

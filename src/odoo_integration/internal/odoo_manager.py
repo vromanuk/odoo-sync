@@ -711,8 +711,7 @@ class OdooManager:
             "objects": result,
         }
 
-    def receive_pickup_locations(self, partners: list[OdooUser]) -> dict[str, Any]:
-        partner_mapper = {p.odoo_id: p for p in partners}
+    def receive_pickup_locations(self, odoo_repo: OdooRepo) -> dict[str, Any]:
         warehouses = self._client.get_odoo_entities(
             "stock.warehouse", i18n_fields=["name"]
         )
@@ -724,7 +723,7 @@ class OdooManager:
                 "_remote_id": warehouse["id"],
                 "name": warehouse["name"],
                 "names": warehouses_names[warehouse["id"]],
-                "partner": partner_mapper.get("partner_id", None),
+                "partner": odoo_repo.get(RedisKeys.USERS, warehouse["partner_id"][0]),
             }
             result.append(warehouse_dto)
         return {
@@ -1100,7 +1099,11 @@ class OdooManager:
         self.repo.insert_many(
             key=RedisKeys.PRODUCTS,
             entities=[
-                OdooProduct(odoo_id=product["id"], name=product["name"])
+                OdooProduct(
+                    odoo_id=product["id"],
+                    name=product["name"],
+                    product=product["ordercast_id"],
+                )
                 for product in products_to_sync
             ],
         )

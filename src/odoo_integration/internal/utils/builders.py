@@ -85,7 +85,7 @@ def get_product_variant_data(
         "names": product_variant["names"],
         "sku": product_variant["code"],
         "attribute_values": [
-            odoo_repo.get(RedisKeys.ATTRIBUTES, a["id"])
+            odoo_repo.get(RedisKeys.ATTRIBUTES, a)
             for a in product_variant.get("attribute_values", [])
         ],
     }
@@ -106,11 +106,12 @@ def get_delivery_option_data(delivery_option: dict[str, Any]) -> dict[str, Any]:
 def get_pickup_location_data(pickup_location: dict[str, Any]) -> dict[str, Any]:
     defaults_data = {}
 
-    if "name" in pickup_location and pickup_location["name"]:
+    if pickup_location.get("name"):
         defaults_data = {
             "id": pickup_location["id"],
             "name": pickup_location["name"],
             "names": pickup_location.get("names", {}),
+            "partner": pickup_location.get("partner"),
         }
         defaults_data.update(get_i18n_field_as_dict(pickup_location, "name"))
 

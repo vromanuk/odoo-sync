@@ -14,7 +14,7 @@ class OrdercastProduct(OrdercastCommon):
 
 
 class OrdercastAttribute(OrdercastCommon):
-    pass
+    code: str
 
 
 class OrdercastCategory(OrdercastCommon):
@@ -146,8 +146,8 @@ class OrdercastMerchant(BaseModel):
 
 class OrdercastFlatMerchant(OrdercastCommon):
     erp_id: str = ""
-    billing_addresses: list[OrdercastBillingAddress] = []
-    shipping_addresses: list[OrdercastShippingAddress] = []
+    billing_addresses: list[dict[str, Any]] = []
+    shipping_addresses: list[dict[str, Any]] = []
 
 
 class OrdercastFlatOrder(BaseModel):

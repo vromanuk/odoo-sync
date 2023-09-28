@@ -189,7 +189,7 @@ def set_user_ordercast_id(
 
 
 def set_ordercast_id(
-    items: list[dict[str, Any]], source: Callable[..., Iterable]
+    items: list[dict[str, Any]], source: Callable[..., Iterable], key: str = "code"
 ) -> list[dict[str, Any]]:
     result = []
 
@@ -197,8 +197,8 @@ def set_ordercast_id(
     synced = source()
 
     for item in synced:
-        if item := mapper.get(item.code):
-            item["ordercast_id"] = item.id
-            result.append(item)
+        if mapped_item := mapper.get(getattr(item, key, None)):
+            mapped_item["ordercast_id"] = item.id
+            result.append(mapped_item)
 
     return result

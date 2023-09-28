@@ -19,7 +19,7 @@ class I18Name(BaseModel):
 
 
 class PriceRate(BaseModel):
-    price: int
+    price: float
     price_rate_id: PositiveInt
     quantity: PositiveInt
 
@@ -147,7 +147,7 @@ class UpsertCategoriesRequest(BaseModel):
 
 class UpsertAttributesRequest(BaseModel):
     code: str
-    name: str
+    name: I18Name
     index: int = 1
     input_type: int = 1
     is_filter: bool = True
@@ -164,12 +164,13 @@ class UpsertProductVariantsRequest(BaseModel):
     barcode: dict[str, str]
     product_id: PositiveInt
     sku: str
-    price_rates: list[dict[str, int]]
+    price_rates: list[PriceRate]
     unit_code: str
     attribute_values: list[dict[str, Any]]
     place_in_warehouse: str
     customs_code: str
     letter: str
+    parent_product_id: PositiveInt
     status: int = 2
     description: str = ""
     packaging: int = 1
@@ -209,4 +210,3 @@ class CreatePickupLocationRequest(BaseModel):
     country: str = "UNITED_KINGDOM"
     contact_name: str = "John Doe"
     contact_phone: str = "+3281000000"
-    image: ImageObject | dict[str, Any] = {}
