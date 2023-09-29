@@ -15,6 +15,7 @@ from src.data import (
     OrdercastFlatOrder,
     OrdercastOrderStatus,
     OrdercastOrder,
+    OrderStatusForSync,
 )
 from src.infrastructure import (
     OrdercastApi,
@@ -355,7 +356,7 @@ class OrdercastManager:
                     street=pickup_location["partner"].street,
                     city=pickup_location["partner"].city,
                     postcode=pickup_location["partner"].postcode,
-                    country=pickup_location["partner"].country or "Belgium-default",
+                    country=pickup_location["partner"].country,
                     contact_name=pickup_location["partner"].contact_name,
                     contact_phone=pickup_location["partner"].contact_phone,
                 )
@@ -419,7 +420,6 @@ class OrdercastManager:
                 "status": order.status,
                 "_remote_id": order.external_id,
                 "user_remote_id": ordercast_order.merchant.external_id,
-                "partner_id": ordercast_order.merchant.external_id,
             }
             if order.shipping_address:
                 order_dto["shipping_address"] = order.shipping_address
@@ -472,9 +472,13 @@ class OrdercastManager:
     ) -> None:
         for order in orders:
             ordercast_order_id = self.ordercast_api.create_order(
-                CreateOrderRequest(
-                    order_status_enum=order["status"],
-                    merchant_id=odoo_repo.get(RedisKeys.USERS, order["partner_id"]),
+                request=CreateOrderRequest(
+                    order_status_enum=OrderStatusForSync.ordercast_to_odoo_status_map(
+                        order["status"]
+                    ).value,
+                    merchant_id=odoo_repo.get(
+                        RedisKeys.USERS, order["partner_id"]
+                    ).ordercast_user,
                     price_rate_id=default_price_rate["id"],
                     external_id=order["id"],
                 )

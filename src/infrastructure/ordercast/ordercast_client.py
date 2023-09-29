@@ -334,7 +334,7 @@ class OrdercastApi:
         return httpx.post(
             url=f"{self.base_url}/order/{order_id}/invoice",
             headers=self._auth_headers,
-            files={"file": filename, "content": file_content},
+            files={"pdf_file": (filename, file_content)},
         )
 
 

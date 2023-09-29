@@ -735,6 +735,9 @@ class OdooManager:
         if not orders:
             return
 
+        default_partner_id = self.receive_partners(partner_type=PartnerType.USER)[0][
+            "id"
+        ]
         remote_orders_obj = self._client["sale.order"]
         remote_orders_line_obj = self._client["sale.order.line"]
         for order_dto in orders:
@@ -754,6 +757,14 @@ class OdooManager:
 
             if is_not_empty(order_dto, "user_remote_id"):
                 send_order["partner_id"] = order_dto["user_remote_id"]
+            else:
+                send_order["partner_id"] = default_partner_id
+                logger.info(
+                    f"""
+                    Order {order_dto['id']} doesn't contain `partner_id`,
+                    setting to a default {default_partner_id}
+                    """
+                )
 
             # default type
             if billing_address_dto:
@@ -762,7 +773,6 @@ class OdooManager:
                 check_remote_id(billing_address_dto)
                 send_order.update(
                     {
-                        # "partner_id": billing_address_dto["_remote_id"],
                         "partner_invoice_id": billing_address_dto["_remote_id"],
                     }
                 )
@@ -773,7 +783,6 @@ class OdooManager:
                 check_remote_id(shipping_address_dto)
                 send_order.update(
                     {
-                        # "partner_id": shipping_address_dto["_remote_id"],
                         "partner_shipping_id": shipping_address_dto["_remote_id"],
                     }
                 )
@@ -789,7 +798,6 @@ class OdooManager:
                     "amount_tax": basket_dto.get("total_taxes", 0),
                     "amount_total": basket_dto.get("grand_total", 0),
                     "amount_untaxed": basket_dto.get("total", 0),
-                    "partner_id": order_dto["partner_id"],
                 }
             )
 
@@ -1058,6 +1066,7 @@ class OdooManager:
                     email=user["email"],
                     phone=user["phone"],
                     city=user["city"],
+                    country=user["country"],
                     postcode=user["postcode"],
                     street=user["street"],
                     ordercast_user=user["ordercast_id"],

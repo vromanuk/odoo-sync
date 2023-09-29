@@ -4,6 +4,7 @@ from typing import Optional, Any
 from pydantic import BaseModel, PositiveInt, model_serializer, EmailStr
 
 
+
 class ImageObject(BaseModel):
     filename: str
     key: str
@@ -96,7 +97,7 @@ class ListOrdersRequest(BasePaginatedRequest):
 
 
 class CreateOrderRequest(BaseModel):
-    order_status_enum: PositiveInt
+    order_status_enum: int
     merchant_id: PositiveInt
     price_rate_id: PositiveInt
     external_id: PositiveInt

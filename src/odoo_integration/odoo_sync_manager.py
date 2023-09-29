@@ -180,8 +180,9 @@ class OdooSyncManager:
         products = self.odoo_manager.get_products(last_sync_date)
 
         logger.info(
-            f"Received {len(products['objects']) if has_objects(products) else 0} "
-            f"products, start saving them."
+            f"""Received {len(products['objects']) if has_objects(products) else 0}
+            products, start saving them.
+            """
         )
 
         if has_objects(products):

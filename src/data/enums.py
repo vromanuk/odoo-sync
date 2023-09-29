@@ -29,9 +29,29 @@ class OrderStatus(str, enum.Enum):
 
 
 class OrderStatusForSync(enum.Enum):
+    NEW = 0
     IN_PROGRESS = 1
+    POSTPONED = 2
     PROCESSED = 3
+    COMPLETED = 5
     CANCELLED_BY_ADMIN = 6
+    CANCELLED_BY_MERCHANT = 7
+    DRAFT = 8
+
+    @classmethod
+    def ordercast_to_odoo_status_map(cls, key: OrderStatus) -> "OrderStatusForSync":
+        return {
+            OrderStatus.DRAFT_STATUS: cls.DRAFT,
+            OrderStatus.IN_PROGRESS_STATUS: cls.IN_PROGRESS,
+            OrderStatus.SENT_STATUS: cls.IN_PROGRESS,
+            OrderStatus.DONE_STATUS: cls.COMPLETED,
+            OrderStatus.SALE_STATUS: cls.NEW,
+            OrderStatus.CANCELLED_BY_ADMIN_STATUS: cls.CANCELLED_BY_ADMIN,
+            OrderStatus.CANCELLED_BY_CLIENT_STATUS: cls.CANCELLED_BY_MERCHANT,
+            OrderStatus.CANCEL_STATUS: cls.CANCELLED_BY_ADMIN,
+            OrderStatus.SUBMITTED_STATUS: cls.NEW,
+            OrderStatus.PENDING_PAYMENT_STATUS: cls.IN_PROGRESS,
+        }.get(key, cls.NEW)
 
 
 class InvoiceStatus(str, enum.Enum):
