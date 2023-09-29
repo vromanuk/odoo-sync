@@ -4,7 +4,6 @@ from typing import Optional, Any
 from pydantic import BaseModel, PositiveInt, model_serializer, EmailStr
 
 
-
 class ImageObject(BaseModel):
     filename: str
     key: str

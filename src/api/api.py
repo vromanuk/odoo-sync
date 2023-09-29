@@ -39,3 +39,17 @@ async def sync(
 ) -> Response:
     odoo_sync_manager.sync()
     return Response(message="Started full sync")
+
+
+@router.get(
+    "/webhooks/order-created",
+    summary="Handle `Order Created` event from Ordercast",
+    response_description="Returns 200 if event handled correctly",
+    tags=["webhooks", "order-created"],
+    response_model=Response,
+)
+async def handle_order_created(
+    odoo_sync_manager: Annotated[OdooSyncManager, Depends(get_odoo_sync_manager)]
+) -> Response:
+    odoo_sync_manager.handle_webhook(topic="order-created")
+    return Response(message="OK")

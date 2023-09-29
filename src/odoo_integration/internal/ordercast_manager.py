@@ -485,9 +485,11 @@ class OrdercastManager:
             )
 
             if file_content := order.get("invoice_file_data"):
+                response = self.ordercast_api.get_order(ordercast_order_id)
+                ordercast_order_internal_id = response.json()["internal_id"]
                 self.ordercast_api.attach_invoice(
                     order_id=ordercast_order_id,
-                    filename=order["invoice_file_name"],
+                    filename=ordercast_order_internal_id + order["invoice_file_name"],
                     file_content=base64.b64decode(file_content),
                 )
                 logger.info(f"Invoice file attached to order {ordercast_order_id}")

@@ -30,6 +30,7 @@ from .internal.validators import (
     validate_delivery_options,
     validate_pickup_locations,
 )
+from .internal.webhook_handler import WebhookHandler
 
 logger = structlog.getLogger(__name__)
 
@@ -40,10 +41,15 @@ class OdooSyncManager:
         repo: OdooRepo,
         odoo_manager: OdooManager,
         ordercast_manager: OrdercastManager,
+        webhook_handler: WebhookHandler,
     ) -> None:
         self.repo = repo
         self.odoo_manager = odoo_manager
         self.ordercast_manager = ordercast_manager
+        self.webhook_handler = webhook_handler
+
+    def handle_webhook(self, topic: str) -> None:
+        self.webhook_handler.handle(topic)
 
     def sync(self) -> None:
         logger.info("Load common data")
@@ -346,4 +352,6 @@ def get_odoo_sync_manager(
     odoo_provider: Annotated[OdooManager, Depends(get_odoo_provider)],
     ordercast_manager: Annotated[OrdercastManager, Depends(get_ordercast_manager)],
 ) -> OdooSyncManager:
-    return OdooSyncManager(odoo_repo, odoo_provider, ordercast_manager)
+    return OdooSyncManager(
+        odoo_repo, odoo_provider, ordercast_manager, WebhookHandler()
+    )
