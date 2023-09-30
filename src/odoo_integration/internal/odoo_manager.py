@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 from typing import Annotated, Optional, Any
 
@@ -766,7 +767,6 @@ class OdooManager:
                     """
                 )
 
-            # default type
             if billing_address_dto:
                 billing_address_dto["type"] = PartnerAddressType.INVOICE.value
                 self.sync_partner(billing_address_dto)
@@ -791,10 +791,13 @@ class OdooManager:
                 if "_remote_id" in delivery_option_dto:
                     send_order["carrier_id"] = delivery_option_dto["_remote_id"]
 
+            order_name = order_dto.get("name", uuid.uuid4().hex)
+            logger.info(f"Order name => {order_name}")
+
             send_order.update(
                 {
-                    "reference": order_dto["name"],
-                    "name": order_dto["name"],
+                    "reference": order_name,
+                    "name": order_name,
                     "amount_tax": basket_dto.get("total_taxes", 0),
                     "amount_total": basket_dto.get("grand_total", 0),
                     "amount_untaxed": basket_dto.get("total", 0),

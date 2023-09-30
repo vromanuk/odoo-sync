@@ -2,6 +2,7 @@ from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Depends
+from fastapi.requests import Request
 
 from src.infrastructure import RedisClient, get_redis_client
 from src.odoo_integration import OdooSyncManager, get_odoo_sync_manager
@@ -41,7 +42,7 @@ async def sync(
     return Response(message="Started full sync")
 
 
-@router.get(
+@router.post(
     "/webhooks/order-created",
     summary="Handle `Order Created` event from Ordercast",
     response_description="Returns 200 if event handled correctly",
@@ -49,7 +50,9 @@ async def sync(
     response_model=Response,
 )
 async def handle_order_created(
-    odoo_sync_manager: Annotated[OdooSyncManager, Depends(get_odoo_sync_manager)]
+    request: Request,
+    odoo_sync_manager: Annotated[OdooSyncManager, Depends(get_odoo_sync_manager)],
 ) -> Response:
-    odoo_sync_manager.handle_webhook(topic="order-created")
+    order = await request.json()
+    odoo_sync_manager.handle_webhook(topic="order-created", order=order)
     return Response(message="OK")

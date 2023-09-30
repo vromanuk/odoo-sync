@@ -48,8 +48,8 @@ class OdooSyncManager:
         self.ordercast_manager = ordercast_manager
         self.webhook_handler = webhook_handler
 
-    def handle_webhook(self, topic: str) -> None:
-        self.webhook_handler.handle(topic)
+    def handle_webhook(self, topic: str, **kwargs: dict[str, Any]) -> None:
+        self.webhook_handler.handle(topic=topic, **kwargs)
 
     def sync(self) -> None:
         logger.info("Load common data")
@@ -353,5 +353,5 @@ def get_odoo_sync_manager(
     ordercast_manager: Annotated[OrdercastManager, Depends(get_ordercast_manager)],
 ) -> OdooSyncManager:
     return OdooSyncManager(
-        odoo_repo, odoo_provider, ordercast_manager, WebhookHandler()
+        odoo_repo, odoo_provider, ordercast_manager, WebhookHandler(odoo_provider)
     )
