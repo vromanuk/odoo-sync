@@ -45,7 +45,7 @@ async def sync(
     "/webhooks/order-created",
     summary="Handle `Order Created` event from Ordercast",
     response_description="Returns 200 if event handled correctly",
-    tags=["webhooks", "order-created"],
+    tags=["order-created"],
     response_model=Response,
 )
 async def handle_order_created(

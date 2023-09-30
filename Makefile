@@ -1,3 +1,5 @@
+COMPOSE_PROJECT_NAME=odoo-sync
+COMPOSE_FILE=docker/docker-compose.yml
 include .env
 export
 
@@ -16,3 +18,9 @@ lint:
 install:
 	pip-compile
 	pip-sync
+
+docker-up:
+	docker-compose up --remove-orphans -d
+
+docker-build:
+	docker-compose build --no-cache
