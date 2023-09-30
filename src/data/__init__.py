@@ -20,6 +20,7 @@ from .models import (
     OdooCategory,
     CategoryType,
     OdooPriceRate,
+    OdooAttributeValue,
 )
 from .ordercast_models import (
     OrdercastFlatMerchant,
@@ -30,6 +31,7 @@ from .ordercast_models import (
     OrdercastOrderStatus,
     OrdercastOrder,
     OrdercastMerchant,
+    OrdercastAttributeValue,
 )
 from .typings import OdooEntity
 
@@ -63,4 +65,6 @@ __all__ = (
     "OrdercastOrderStatus",
     "OrdercastOrder",
     "OrdercastMerchant",
+    "OrdercastAttributeValue",
+    "OdooAttributeValue",
 )

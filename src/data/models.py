@@ -78,3 +78,8 @@ class OdooBasketProduct(OdooCommons):
 class OdooPriceRate(BaseModel):
     id: PositiveInt
     name: str
+
+
+class OdooAttributeValue(OdooCommons):
+    name: str
+    ordercast_id: PositiveInt

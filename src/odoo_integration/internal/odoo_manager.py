@@ -22,6 +22,7 @@ from src.data import (
     OdooPickupLocation,
     InvoiceStatus,
     OrdercastFlatMerchant,
+    OdooAttributeValue,
 )
 from src.infrastructure import OdooClient, get_odoo_client
 from src.odoo_integration.internal.utils.helpers import (
@@ -1181,6 +1182,22 @@ class OdooManager:
                     odoo_invoice_status=order["odoo_invoice_status"],
                 )
                 for order in orders
+            ],
+        )
+
+    def save_attribute_values(
+        self, attribute_values_to_sync: list[dict[str, Any]]
+    ) -> None:
+        self.repo.insert_many(
+            key=RedisKeys.ATTRIBUTE_VALUES,
+            entities=[
+                OdooAttributeValue(
+                    odoo_id=attribute_value["id"],
+                    sync_date=datetime.now(timezone.utc),
+                    ordercast_id=attribute_value["ordercast_id"],
+                    name=attribute_value["name"],
+                )
+                for attribute_value in attribute_values_to_sync
             ],
         )
 

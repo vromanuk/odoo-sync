@@ -26,6 +26,7 @@ from .ordercast import (
     Employee,
     OrdercastApiValidationException,
     paginated,
+    UpsertAttributeValuesRequest,
 )
 from .redis_client import RedisClient, get_redis_client
 
@@ -60,4 +61,5 @@ __all__ = (
     "Employee",
     "OrdercastApiValidationException",
     "paginated",
+    "UpsertAttributeValuesRequest",
 )

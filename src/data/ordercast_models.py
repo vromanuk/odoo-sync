@@ -190,3 +190,7 @@ class OrdercastOrder(BaseModel):
     shipping_address: Optional[OrdercastShippingAddress] = None
     pickup_location: Optional[OrdercastPickupLocation] = None
     billing_address: Optional[OrdercastBillingAddress] = None
+
+
+class OrdercastAttributeValue(OrdercastCommon):
+    pass

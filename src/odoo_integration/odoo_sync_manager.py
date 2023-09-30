@@ -22,6 +22,7 @@ from .internal.utils import (
     set_user_ordercast_id,
     validate_partners,
 )
+from .internal.utils.helpers import set_attribute_value_ordercast_id
 from .internal.validators import (
     validate_products,
     validate_categories,
@@ -124,7 +125,7 @@ class OdooSyncManager:
             full_sync=full_sync,
         )
 
-    def sync_categories_to_ordercast(self) -> dict[str, Any]:
+    def sync_categories_to_ordercast(self) -> None:
         categories = self.odoo_manager.get_categories()
         logger.info(
             f"""
@@ -144,9 +145,7 @@ class OdooSyncManager:
                 )
             )
 
-        return categories
-
-    def sync_attributes_to_ordercast(self) -> dict[str, Any]:
+    def sync_attributes_to_ordercast(self) -> None:
         attributes = self.odoo_manager.get_product_attributes()
 
         logger.info(
@@ -161,25 +160,57 @@ class OdooSyncManager:
         if attributes:
             validate_attributes(attributes)
             attributes_to_sync = [
-                get_attribute_data(value)
-                for attribute in attributes["objects"]
-                for value in attribute.get("values", [])
-                if all(key in value for key in ("id", "name"))
+                get_attribute_data(attribute) for attribute in attributes["objects"]
             ]
+            attribute_values_to_sync = {
+                a["id"]: a.get("values", []) for a in attributes["objects"]
+            }
 
+            logger.info("Syncing attributes")
             self.ordercast_manager.save_attributes(
                 attributes_to_sync=attributes_to_sync
             )
+            attributes_with_ordercast_id = set_ordercast_id(
+                items=attributes_to_sync,
+                source=self.ordercast_manager.get_attributes,
+            )
             self.odoo_manager.save_attributes(
-                attributes_to_sync=set_ordercast_id(
-                    items=attributes_to_sync,
-                    source=self.ordercast_manager.get_attributes,
-                )
+                attributes_to_sync=attributes_with_ordercast_id
             )
 
-        return attributes
+            self.sync_attribute_values(
+                attribute_values_to_sync=attribute_values_to_sync,
+                attributes_with_ordercast_id=attributes_with_ordercast_id,
+            )
 
-    def sync_products_to_ordercast(self, full_sync: bool = False) -> dict[str, Any]:
+    def sync_attribute_values(
+        self,
+        attribute_values_to_sync: dict[int, Any],
+        attributes_with_ordercast_id: list[dict[str, Any]],
+    ) -> None:
+        logger.info("Syncing attribute values")
+
+        attributes_odoo_to_ordercast_mapper = {
+            a["id"]: a["ordercast_id"] for a in attributes_with_ordercast_id
+        }
+
+        self.ordercast_manager.save_attribute_values(
+            attributes_odoo_to_ordercast_mapper=attributes_odoo_to_ordercast_mapper,
+            attribute_values_to_sync=attribute_values_to_sync,
+        )
+        self.odoo_manager.save_attribute_values(
+            attribute_values_to_sync=set_attribute_value_ordercast_id(
+                attributes_odoo_to_ordercast_mapper=attributes_odoo_to_ordercast_mapper,
+                attribute_values=[
+                    value
+                    for attribute_value in attribute_values_to_sync.values()
+                    for value in attribute_value
+                ],
+                source=self.ordercast_manager.get_attribute_values,
+            )
+        )
+
+    def sync_products_to_ordercast(self, full_sync: bool = False) -> None:
         last_sync_date = (
             None if full_sync else self.repo.get_key(RedisKeys.LAST_PRODUCT_SYNC)
         )
@@ -207,8 +238,6 @@ class OdooSyncManager:
                     key="sku",
                 )
             )
-
-        return products
 
     def sync_product_variants_to_ordercast(
         self,

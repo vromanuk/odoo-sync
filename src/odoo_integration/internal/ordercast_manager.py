@@ -16,6 +16,7 @@ from src.data import (
     OrdercastOrderStatus,
     OrdercastOrder,
     OrderStatusForSync,
+    OrdercastAttributeValue,
 )
 from src.infrastructure import (
     OrdercastApi,
@@ -44,6 +45,7 @@ from src.infrastructure import (
     Employee,
     OrdercastApiValidationException,
     paginated,
+    UpsertAttributeValuesRequest,
 )
 from .constants import ORDER_STATUSES_FOR_SYNC
 from .odoo_repo import RedisKeys, OdooRepo
@@ -200,6 +202,14 @@ class OrdercastManager:
             OrdercastAttribute(
                 id=attribute["id"], name=attribute["name"], code=attribute["code"]
             )
+            for attribute in response.json()
+        ]
+
+    def get_attribute_values(self, attribute_id: int) -> list[OrdercastAttributeValue]:
+        logger.info("Receiving attribute values from Ordercast")
+        response = self.ordercast_api.get_attribute_values(attribute_id=attribute_id)
+        return [
+            OrdercastAttributeValue(id=attribute["id"], name=attribute["name"])
             for attribute in response.json()
         ]
 
@@ -504,6 +514,20 @@ class OrdercastManager:
             user.shipping_addresses = shipping_addresses.get(user.id, [])
 
         return users
+
+    def save_attribute_values(
+        self,
+        attributes_odoo_to_ordercast_mapper: dict[int, int],
+        attribute_values_to_sync: dict[int, Any],
+    ) -> None:
+        for attribute_id, attribute_values in attribute_values_to_sync.items():
+            self.ordercast_api.upsert_attribute_values(
+                attribute_id=attributes_odoo_to_ordercast_mapper[attribute_id],
+                request=[
+                    UpsertAttributeValuesRequest(name=attribute_value["name"])
+                    for attribute_value in attribute_values
+                ],
+            )
 
 
 def get_ordercast_manager(

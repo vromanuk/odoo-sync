@@ -188,6 +188,29 @@ def set_user_ordercast_id(
     return result
 
 
+def set_attribute_value_ordercast_id(
+    attributes_odoo_to_ordercast_mapper: dict[int, int],
+    attribute_values: list[dict[str, Any]],
+    source: Callable[..., Iterable],
+) -> list[dict[str, Any]]:
+    result = []
+
+    mapper = {a["name"]: a for a in attribute_values}
+
+    for (
+        odoo_attribute_value,
+        ordercast_attribute_value,
+    ) in attributes_odoo_to_ordercast_mapper.items():
+        synced = source(ordercast_attribute_value)
+
+        for item in synced:
+            if mapped_item := mapper.get(item.name):
+                mapped_item["ordercast_id"] = item.id
+                result.append(mapped_item)
+
+    return result
+
+
 def set_ordercast_id(
     items: list[dict[str, Any]], source: Callable[..., Iterable], key: str = "code"
 ) -> list[dict[str, Any]]:

@@ -210,3 +210,7 @@ class CreatePickupLocationRequest(BaseModel):
     country: str = "UNITED_KINGDOM"
     contact_name: str = "John Doe"
     contact_phone: str = "+3281000000"
+
+
+class UpsertAttributeValuesRequest(BaseModel):
+    name: str

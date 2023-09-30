@@ -33,6 +33,7 @@ from .ordercast_api_requests import (
     AddDeliveryMethodRequest,
     CreatePickupLocationRequest,
     ListOrdersRequest,
+    UpsertAttributeValuesRequest,
 )
 
 logger = structlog.getLogger(__name__)
@@ -175,7 +176,7 @@ class OrdercastApi:
     @error_handler
     def upsert_attributes(self, request: list[UpsertAttributesRequest]) -> Response:
         return httpx.post(
-            url=f"{self.base_url}/attribute/",
+            url=f"{self.base_url}/attribute/?delete_unlisted=true",
             json=[model.model_dump() for model in request],
             headers=self._auth_headers,
         )
@@ -335,6 +336,23 @@ class OrdercastApi:
             url=f"{self.base_url}/order/{order_id}/invoice",
             headers=self._auth_headers,
             files={"pdf_file": (filename, file_content)},
+        )
+
+    @error_handler
+    def upsert_attribute_values(
+        self, attribute_id: int, request: list[UpsertAttributeValuesRequest]
+    ) -> Response:
+        return httpx.post(
+            url=f"{self.base_url}/attribute/{attribute_id}/value/",
+            json=[m.model_dump() for m in request],
+            headers=self._auth_headers,
+        )
+
+    @error_handler
+    def get_attribute_values(self, attribute_id: int) -> Response:
+        return httpx.get(
+            url=f"{self.base_url}/attribute/{attribute_id}/value/",
+            headers=self._auth_headers,
         )
 
 

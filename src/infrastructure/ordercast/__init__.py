@@ -21,6 +21,7 @@ from .ordercast_api_requests import (
     CreatePickupLocationRequest,
     ListOrdersRequest,
     Employee,
+    UpsertAttributeValuesRequest,
 )
 from .ordercast_client import OrdercastApi, get_ordercast_api, paginated
 from .exceptions import OrdercastApiValidationException
@@ -52,4 +53,5 @@ __all__ = (
     "Employee",
     "OrdercastApiValidationException",
     "paginated",
+    "UpsertAttributeValuesRequest",
 )
