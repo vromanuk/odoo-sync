@@ -32,19 +32,20 @@ def is_unique_by(
     return True
 
 
-def is_length_not_in_range(value, min_length, max_length):
+def is_length_not_in_range(value: Any, min_length: int, max_length: int) -> bool:
     res = is_length_in_range(value, min_length, max_length)
     return res is not None and not res
 
 
-def is_length_in_range(value, min_length, max_length):
+def is_length_in_range(value: Any, min_length: int, max_length: int) -> bool:
     if value and min_length and max_length:
         local_val = str(value).strip()
         return min_length <= len(local_val) <= max_length
+    return False
 
 
 def get_i18n_field_as_dict(
-    data: dict,
+    data: dict[str, Any],
     field: str,
     rename_field: Optional[str] = None,
     reg_exp: Optional[str] = None,
@@ -66,7 +67,12 @@ def get_i18n_field_as_dict(
     return result
 
 
-def get_field_with_i18n_fields(data: dict, field, rename_field=None, reg_exp=None):
+def get_field_with_i18n_fields(
+    data: dict[str, Any],
+    field: Any,
+    rename_field: Optional[Any] = None,
+    reg_exp: Optional[Any] = None,
+) -> Any:
     i18n_fields_dict = get_i18n_field_as_dict(data, field, rename_field, reg_exp)
     if i18n_fields_dict:
         result = [field]
@@ -76,31 +82,32 @@ def get_field_with_i18n_fields(data: dict, field, rename_field=None, reg_exp=Non
         return result
 
 
-def is_format(value, fmt):
+def is_format(value: str, fmt: str) -> Any:
     if value and fmt:
         return regexp.match(fmt, value, regexp.IGNORECASE)
 
 
-def is_not_ref(value):
+def is_not_ref(value: str) -> bool:
     res = is_ref(value)
     return res is not None and not res
 
 
-def is_ref(value):
+def is_ref(value: str) -> Any:
     ref_regexp = r"^[\w\-\.]*$"
     return is_format(value, ref_regexp)
 
 
-def has_objects(entities: dict[str, Any]) -> bool:
+def has_objects(entities: dict[str, Any]) -> Any:
     return entities and "objects" in entities and len(entities["objects"]) > 0
 
 
 def exists_in_all_ids(entity_id: int, entity: dict[str, Any]) -> bool:
     if entity and "all_ids" in entity:
         return entity_id in entity["all_ids"]
+    return False
 
 
-def str_to_float(data, default=None):
+def str_to_float(data: Any, default: Optional[Any] = None) -> Any:
     if not data:
         return default
     try:
@@ -114,12 +121,12 @@ def str_to_float(data, default=None):
         return default
 
 
-def str_to_int(data, default=None):
+def str_to_int(data: Any, default: Optional[Any] = None) -> Any:
     num = str_to_float(data, default)
     return int(num) if num is not None else default
 
 
-def check_remote_id(dto):
+def check_remote_id(dto: Any) -> Any:
     if "_remote_id" not in dto:
         msg = f"Not remote id found for {dto['id']}. Please check it."
         raise SyntaxError(msg)
@@ -132,17 +139,18 @@ def get_entity_name_as_i18n(
     Transforms entities with translated names into a dictionary mapping entity IDs
     to language-specific names.
 
-    :param prefix: The prefix used in the entity keys to identify language-specific names.
-                   Default is "name_".
-    :param entities: List of dictionaries with keys like "name_language" (e.g., "name_de" for German).
-                     Values are the translated names in respective languages.
-                     Example: {"name_de": "German Name", "name_fr": "French Name"}
+    :param prefix: The prefix used in the entity keys to identify language-specific
+                names. Default is "name_".
+    :param entities: List of dictionaries with keys like "name_language"
+                (e.g., "name_de" for German).
+                Values are the translated names in respective languages.
+                Example: {"name_de": "German Name", "name_fr": "French Name"}
 
     :return: Dictionary where each entity ID maps to language-to-name mappings.
              Example: {1: {"de": "German Name", "fr": "French Name"},
                        2: {"de": "German Name 2", "fr": "French Name 2"}, ...}
     """
-    entities_names = defaultdict(dict)
+    entities_names = defaultdict(dict)  # type: ignore
     for entity in entities:
         for k, v in entity.items():
             if k.startswith(prefix):
@@ -173,7 +181,7 @@ def slugify(value: str) -> str:
 
 
 def set_user_ordercast_id(
-    users_to_sync: list[dict[str, Any]], source: Callable[..., Iterable]
+    users_to_sync: list[dict[str, Any]], source: Callable[..., Iterable[Any]]
 ) -> list[dict[str, Any]]:
     result = []
 
@@ -191,7 +199,7 @@ def set_user_ordercast_id(
 def set_attribute_value_ordercast_id(
     attributes_odoo_to_ordercast_mapper: dict[int, int],
     attribute_values: list[dict[str, Any]],
-    source: Callable[..., Iterable],
+    source: Callable[..., Iterable[Any]],
 ) -> list[dict[str, Any]]:
     result = []
 
@@ -212,7 +220,7 @@ def set_attribute_value_ordercast_id(
 
 
 def set_ordercast_id(
-    items: list[dict[str, Any]], source: Callable[..., Iterable], key: str = "code"
+    items: list[dict[str, Any]], source: Callable[..., Iterable[Any]], key: str = "code"
 ) -> list[dict[str, Any]]:
     result = []
 
@@ -220,7 +228,7 @@ def set_ordercast_id(
     synced = source()
 
     for item in synced:
-        if mapped_item := mapper.get(getattr(item, key, None)):
+        if mapped_item := mapper.get(getattr(item, key, None)):  # type: ignore
             mapped_item["ordercast_id"] = item.id
             result.append(mapped_item)
 

@@ -21,7 +21,7 @@ def validate_product_variants(product_variants: list[dict[str, Any]]) -> None:
     if not product_variants:
         return
 
-    unique_refs = set()
+    unique_refs = set()  # type: ignore
     has_error = False
     for product in product_variants:
         if is_empty(product, "id"):

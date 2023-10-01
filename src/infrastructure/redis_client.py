@@ -20,7 +20,7 @@ class RedisClient:
     def set(self, key: str, entity: str) -> None:
         self._client.set(name=key, value=entity)
 
-    def sscan(self, key: str) -> Iterator:
+    def sscan(self, key: str) -> Iterator[Any]:
         return self._client.sscan_iter(key)
 
     def get_many(self, key: str) -> list[OdooEntity]:
@@ -52,7 +52,7 @@ class RedisClient:
             self.insert(
                 entity=entity,
                 entities_key=key,
-                entity_key=f"{key}:{entity.odoo_id}",
+                entity_key=f"{key}:{entity.odoo_id}",  # type: ignore
                 pipeline=pipeline,
             )
         pipeline.execute()
@@ -66,7 +66,7 @@ class RedisClient:
     def length(self, key: str) -> Awaitable[int] | int:
         return self._client.scard(key)
 
-    def get_unique(self, compare_to: str, comparable: str, entities: list[int]) -> Any:
+    def get_diff(self, compare_to: str, comparable: str, entities: list[int]) -> Any:
         pipeline = self._client.pipeline()
         pipeline.sadd(comparable, *entities)
         pipeline.sdiff(comparable, compare_to)

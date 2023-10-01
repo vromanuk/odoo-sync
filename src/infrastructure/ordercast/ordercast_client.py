@@ -34,6 +34,7 @@ from .ordercast_api_requests import (
     CreatePickupLocationRequest,
     ListOrdersRequest,
     UpsertAttributeValuesRequest,
+    ListProductVariantsRequest,
 )
 
 logger = structlog.getLogger(__name__)
@@ -125,10 +126,10 @@ class OrdercastApi:
         }
 
     @error_handler
-    def bulk_signup(self, request: list[BulkSignUpRequest]) -> Response:
+    def bulk_signup(self, request: BulkSignUpRequest) -> Response:
         return httpx.post(
             url=f"{self.base_url}/merchant/signup/",
-            json=[model.model_dump() for model in request],
+            json=request.model_dump(),
             headers=self._auth_headers,
         )
 
@@ -184,7 +185,7 @@ class OrdercastApi:
     @error_handler
     def upsert_units(self, request: list[UpsertUnitsRequest]) -> Response:
         return httpx.post(
-            url=f"{self.base_url}/product/unit/",
+            url=f"{self.base_url}/product/unit/?delete_unlisted=true",
             json=[model.model_dump() for model in request],
             headers=self._auth_headers,
         )
@@ -192,7 +193,7 @@ class OrdercastApi:
     @error_handler
     def upsert_products(self, request: list[UpsertProductsRequest]) -> Response:
         return httpx.post(
-            url=f"{self.base_url}/product/",
+            url=f"{self.base_url}/product/?delete_unlisted=true",
             json=[model.model_dump() for model in request],
             headers=self._auth_headers,
         )
@@ -202,7 +203,7 @@ class OrdercastApi:
         self, request: list[UpsertProductVariantsRequest]
     ) -> Response:
         return httpx.post(
-            url=f"{self.base_url}/product/variant/",
+            url=f"{self.base_url}/product/variant/?delete_unlisted=true",
             json=[model.model_dump() for model in request],
             headers=self._auth_headers,
         )
@@ -270,6 +271,13 @@ class OrdercastApi:
         )
 
     @error_handler
+    def get_product_variants(self, request: ListProductVariantsRequest) -> Response:
+        return httpx.get(
+            url=f"{self.base_url}/product/variant/?pageIndex={request.pageIndex}&pageSize={request.pageSize}&prevId={request.prevId}",
+            headers=self._auth_headers,
+        )
+
+    @error_handler
     def get_attributes(self) -> Response:
         return httpx.get(
             url=f"{self.base_url}/attribute/",
@@ -286,7 +294,7 @@ class OrdercastApi:
     @error_handler
     def upsert_price_rate(self, request: list[UpsertPriceRatesRequest]) -> Response:
         return httpx.post(
-            url=f"{self.base_url}/price-rate/",
+            url=f"{self.base_url}/price-rate/?delete_unlisted=true",
             json=[m.model_dump() for m in request],
             headers=self._auth_headers,
         )

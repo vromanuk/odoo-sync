@@ -1,5 +1,5 @@
 import enum
-from typing import Optional, Annotated, Any
+from typing import Optional, Annotated, Any, Awaitable
 
 from fastapi import Depends
 
@@ -24,6 +24,7 @@ from src.infrastructure import RedisClient, get_redis_client
 class RedisKeys(str, enum.Enum):
     USERS = "users"
     SYNC_ORDERCAST_USERS = "sync_ordercast_users"
+    SYNC_ORDERCAST_ORDERS = "sync_ordercast_orders"
     ADDRESSES = "addresses"
     PRODUCTS = "products"
     ATTRIBUTES = "attributes"
@@ -40,8 +41,6 @@ class RedisKeys(str, enum.Enum):
 
     LAST_PRODUCT_SYNC = "last_product_sync"
     LAST_PRODUCT_VARIANT_SYNC = "last_pv_sync"
-
-    DEFAULT_PRICE_RATE = "default_price_rate"
 
 
 class OdooRepo:
@@ -94,13 +93,13 @@ class OdooRepo:
         }
 
     def get_list(self, key: RedisKeys) -> list[OdooEntity]:
-        entity_schema = self._schema.get(key)
-        entity_key = entity_schema.get("key")
-        entity_model = entity_schema.get("model")
+        entity_schema = self._schema[key]
+        entity_key = entity_schema["key"]
+        entity_model = entity_schema["model"]
 
         return [
-            entity_model.from_json(entity_json)
-            for entity_json in self._client.get_many(entity_key)
+            entity_model.from_json(entity_json)  # type: ignore
+            for entity_json in self._client.get_many(entity_key)  # type: ignore
         ]
 
     def get(self, key: RedisKeys, entity_id: int) -> Optional[OdooEntity]:
@@ -109,30 +108,30 @@ class OdooRepo:
         entity_model = entity_schema["model"]
 
         entity_json = self._client.get(f"{entity_key}:{entity_id}")
-        return entity_model.from_json(entity_json) if entity_json else None
+        return entity_model.from_json(entity_json) if entity_json else None  # type: ignore  # noqa
 
     def insert_many(self, key: RedisKeys, entities: list[OdooEntity]) -> None:
-        entity_schema = self._schema.get(key)
-        entity_key = entity_schema.get("key")
+        entity_schema = self._schema[key]
+        entity_key = entity_schema["key"]
 
-        self._client.insert_many(entities, key=entity_key)
+        self._client.insert_many(entities, key=entity_key)  # type: ignore
 
     def insert(self, key: RedisKeys, entity: OdooEntity) -> None:
-        entity_schema = self._schema.get(key)
-        entity_key = entity_schema.get("key")
+        entity_schema = self._schema[key]
+        entity_key = entity_schema["key"]
 
         self._client.insert(
             entity=entity,
-            entities_key=entity_key,
-            entity_key=f"{entity_key}:{entity.odoo_id}",
+            entities_key=entity_key,  # type: ignore
+            entity_key=f"{entity_key}:{entity.odoo_id}",  # type: ignore
         )
 
     def set(self, key: RedisKeys, entity: OdooEntity) -> None:
         self._client.set(key=f"{self._prefix}:{key}", entity=entity.json())
 
     def remove(self, key: RedisKeys, entity_id: int) -> None:
-        entity_schema = self._schema.get(key)
-        entity_key = entity_schema.get("key")
+        entity_schema = self._schema[key]
+        entity_key = entity_schema["key"]
 
         self._client.remove(f"{entity_key}:{entity_id}")
 
@@ -140,22 +139,22 @@ class OdooRepo:
         return self._client.get(f"{self._prefix}:{key}")
 
     def get_all(self, key: RedisKeys) -> list[int]:
-        entity_schema = self._schema.get(key)
-        entity_key = entity_schema.get("key")
-        return list(self._client.sscan(entity_key))
-
-    def get_len(self, key: RedisKeys) -> int:
         entity_schema = self._schema[key]
         entity_key = entity_schema["key"]
-        return self._client.length(entity_key)
+        return list(self._client.sscan(entity_key))  # type: ignore
 
-    def get_unique(
+    def get_len(self, key: RedisKeys) -> Awaitable[int] | int:
+        entity_schema = self._schema[key]
+        entity_key = entity_schema["key"]
+        return self._client.length(entity_key)  # type: ignore
+
+    def get_diff(
         self, compare_to: RedisKeys, comparable: RedisKeys, entities: list[Any]
     ) -> Any:
         entity_schema = self._schema[compare_to]
         compare_to_key = entity_schema["key"]
-        return self._client.get_unique(
-            compare_to=compare_to_key,
+        return self._client.get_diff(
+            compare_to=compare_to_key,  # type: ignore
             comparable=f"{self._prefix}:{comparable}",
             entities=entities,
         )

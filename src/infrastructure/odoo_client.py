@@ -49,17 +49,15 @@ class OdooClient:
                                 for field in fields:
                                     code = lang["iso_code"]
                                     code = code[0:2] if "_" in code else code
-                                    data[field + "_" + code] = remote_result[field]
+                                    data[f"{field}_{code}"] = remote_result[field]
                                 break
         return list_data
 
     @staticmethod
     def get_odoo_entity(obj: Any) -> dict[str, Any]:
-        if (
-            isinstance(obj, list) and len(obj) > 1
-        ):  # clear [int, str] mixed lists, leave only fist type
+        if isinstance(obj, list) and len(obj) > 1:
             first_type = None
-            remove_item = []
+            remove_item = []  # type:ignore
             for item in obj:
                 if first_type:
                     if first_type != type(item):

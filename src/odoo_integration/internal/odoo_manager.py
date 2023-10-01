@@ -32,6 +32,7 @@ from src.odoo_integration.internal.utils.helpers import (
     check_remote_id,
     get_entity_name_as_i18n,
 )
+from .exceptions import OdooSyncException
 from .odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
 from .utils import Partner
 
@@ -141,7 +142,7 @@ class OdooManager:
         self, users: list[OrdercastFlatMerchant]
     ) -> list[OrdercastFlatMerchant]:
         logger.info("Getting unique users to sync with Odoo")
-        _, unique_users = self.repo.get_unique(
+        _, unique_users = self.repo.get_diff(
             compare_to=RedisKeys.USERS,
             comparable=RedisKeys.SYNC_ORDERCAST_USERS,
             entities=[u.erp_id for u in users],
@@ -279,9 +280,6 @@ class OdooManager:
         }
         if "address_two" in partner:
             send_partner["street2"] = partner["address_two"]
-        # if 'vat' in partner:  # todo: check format it should as in odoo
-        #     send_partner['vat'] = partner['vat']
-
         if "website" in partner:
             send_partner["website"] = partner["website"]
         if "comment" in partner:
@@ -347,9 +345,9 @@ class OdooManager:
         self.repo.insert(
             key=RedisKeys.ADDRESSES,
             entity=OdooAddress(
-                odoo_id=remote_id,
+                odoo_id=remote_id,  # type: ignore
                 sync_date=datetime.now(timezone.utc),
-                address=remote_id,
+                address=remote_id,  # type: ignore
             ),
         )
 
@@ -399,7 +397,7 @@ class OdooManager:
         self,
         remote_object_name: str,
         from_date: Optional[datetime] = None,
-        i18n_fields: list[str] = None,
+        i18n_fields: Optional[list[str]] = None,
         filter_criteria: Any = None,
         remote_ids: Optional[list[int]] = None,
     ) -> Any:
@@ -448,7 +446,7 @@ class OdooManager:
 
         def get_attribute(attribute_ids: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if product_template_attributes and attribute_ids:
-                result_ids = []
+                result_ids = []  # type: ignore
                 for attribute in product_template_attributes:
                     if "id" in attribute and attribute["id"] in attribute_ids:
                         result_ids.extend(
@@ -590,7 +588,7 @@ class OdooManager:
                 "_remote_id": category["id"],
                 "name": category["name"],
                 **get_i18n_field_as_dict(category, "name"),
-                "parent": self._client.get_odoo_entity(category["parent_id"])[0]
+                "parent": self._client.get_odoo_entity(category["parent_id"])[0]  # type: ignore  # noqa
                 if category["parent_id"]
                 else None,
                 "groups": self._client.get_odoo_entity(category["product_tmpl_ids"])
@@ -743,7 +741,7 @@ class OdooManager:
         remote_orders_obj = self._client["sale.order"]
         remote_orders_line_obj = self._client["sale.order.line"]
         for order_dto in orders:
-            send_order = {
+            send_order = {  # type: ignore
                 "order_line": [],
             }
 
@@ -830,12 +828,12 @@ class OdooManager:
                         existing_remote_order["state"] != OrderStatus.CANCEL_STATUS
                         and order_dto["status"] == OrderStatus.CANCELLED_BY_ADMIN_STATUS
                     ):
-                        send_order["state"] = OrderStatus.CANCEL_STATUS
+                        send_order["state"] = OrderStatus.CANCEL_STATUS  # type: ignore
                     remote_orders_obj.write(remote_order_id, send_order)
                     create_remote_order = False
 
             if create_remote_order:
-                send_order["state"] = OrderStatus.SALE_STATUS
+                send_order["state"] = OrderStatus.SALE_STATUS  # type: ignore
                 remote_order_id = remote_orders_obj.create(send_order)
                 order_dto["_remote_id"] = remote_order_id
             if remote_order_id:
@@ -854,7 +852,7 @@ class OdooManager:
                         key=RedisKeys.ORDERS,
                         entity=OdooOrder(
                             odoo_id=remote_order_id,
-                            order=odoo_order.id,
+                            order=order_dto["id"],
                             odoo_order_status=defaults["odoo_order_status"],
                             odoo_invoice_status=defaults["odoo_invoice_status"],
                         ),
@@ -921,15 +919,20 @@ class OdooManager:
         orders_invoice_attach_pending: list[int],
         from_date: Optional[datetime] = None,
     ) -> list[dict[str, Any]]:
-        # if not self.repo.get_len(RedisKeys.ORDERS):
-        #     logger.info(
-        #         "There are no order were send to Odoo" "seems no orders created yet."
-        #     )
-        #     return []
+        if not self.repo.get_len(RedisKeys.ORDERS):
+            logger.info(
+                "There are no order were send to Odoo" "seems no orders created yet."
+            )
+            return []
 
-        synced_orders = self.repo.get_all(RedisKeys.ORDERS)
         odoo_orders = self.get_remote_updated_objects("sale.order")
-        orders = [o for o in odoo_orders if o["id"] not in synced_orders]
+        logger.info(f"Received {len(odoo_orders)} from Odoo. Creating DTOs...")
+        _, unique_orders = self.repo.get_diff(
+            compare_to=RedisKeys.ORDERS,
+            comparable=RedisKeys.SYNC_ORDERCAST_ORDERS,
+            entities=[o["id"] for o in odoo_orders],
+        )
+        orders = [o for o in odoo_orders if o["id"] in unique_orders]
 
         if orders_invoice_attach_pending:
             status_check_orders = self._client.get_odoo_entities(
@@ -1027,22 +1030,21 @@ class OdooManager:
                             order_line["product_id"]
                         )
                         if product_id:
-                            odoo_product = self.repo.get(
+                            product_variant = self.repo.get(
                                 key=RedisKeys.PRODUCT_VARIANTS, entity_id=product_id
                             )
-                            if odoo_product:
-                                product = odoo_product.product
-                                order_line_dto["product_id"] = product.id
-                                order_line_dto["name"] = product.name
+                            if product_variant:
+                                order_line_dto[
+                                    "product_id"
+                                ] = product_variant.ordercast_id  # type: ignore
                             else:
-                                pass
-                                # msg = f"""
-                                # Odoo product for remote_id = {product_id} not found.
-                                # Please sync products first to make this working properly
-                                # """
-                                # logger.error(msg)
-                                # raise OdooSyncException(msg)
-                            order_line_dto["_remote_product_id"] = product_id  # not id
+                                msg = f"""
+                            Odoo product for remote_id = {product_id} not found.
+                            Please sync products first to make this working properly
+                                """
+                                logger.error(msg)
+                                raise OdooSyncException(msg)
+                            order_line_dto["_remote_product_id"] = product_id
                         else:
                             logger.warn(
                                 f"""
@@ -1064,7 +1066,7 @@ class OdooManager:
         self.repo.insert_many(
             key=RedisKeys.USERS,
             entities=[
-                OdooUser(
+                OdooUser(  # type: ignore
                     odoo_id=user["erp_id"],
                     sync_date=datetime.now(timezone.utc),
                     email=user["email"],
@@ -1128,7 +1130,9 @@ class OdooManager:
             key=RedisKeys.PRODUCT_VARIANTS,
             entities=[
                 OdooProductVariant(
-                    odoo_id=product_variant["id"], name=product_variant["name"]
+                    odoo_id=product_variant["id"],
+                    name=product_variant["name"],
+                    ordercast_id=product_variant["ordercast_id"],
                 )
                 for product_variant in product_variants_to_sync
             ],
@@ -1162,11 +1166,11 @@ class OdooManager:
 
     def get_orders_invoice_attach_pending(self) -> list[int]:
         return [
-            order.odoo_id
+            order.odoo_id  # type: ignore
             for order in self.repo.get_list(RedisKeys.ORDERS)
-            if order.odoo_order_status == OrderStatus.SALE_STATUS
-            and order.odoo_invoice_status == InvoiceStatus.INV_INVOICED_STATUS
-            and order.odoo_order_status
+            if order.odoo_order_status == OrderStatus.SALE_STATUS  # type: ignore
+            and order.odoo_invoice_status == InvoiceStatus.INV_INVOICED_STATUS  # type: ignore  # noqa
+            and order.odoo_order_status  # type: ignore
             not in [OrderStatus.PROCESSED_STATUS, OrderStatus.PENDING_PAYMENT_STATUS]
         ]
 
@@ -1191,7 +1195,7 @@ class OdooManager:
         self.repo.insert_many(
             key=RedisKeys.ATTRIBUTE_VALUES,
             entities=[
-                OdooAttributeValue(
+                OdooAttributeValue(  # type: ignore
                     odoo_id=attribute_value["id"],
                     sync_date=datetime.now(timezone.utc),
                     ordercast_id=attribute_value["ordercast_id"],

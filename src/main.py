@@ -25,7 +25,9 @@ def configure_logging() -> None:
 
     if env == "dev":
         structlog.configure(
-            processors=shared_processors + [structlog.dev.ConsoleRenderer()],
+            processors=(
+                shared_processors + [structlog.dev.ConsoleRenderer()]  # type: ignore
+            ),
             wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG),
             context_class=dict,
             logger_factory=structlog.PrintLoggerFactory(),
@@ -33,7 +35,7 @@ def configure_logging() -> None:
         )
     else:
         structlog.configure(
-            processors=shared_processors
+            processors=shared_processors  # type: ignore
             + [
                 structlog.processors.dict_tracebacks,
                 structlog.processors.JSONRenderer(),

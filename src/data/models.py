@@ -31,7 +31,7 @@ class OdooCategory(OdooCommons):
 
 class OdooProductVariant(OdooCommons):
     name: str
-    product_variant: Optional[PositiveInt] = None
+    ordercast_id: PositiveInt
 
 
 class OdooAttribute(OdooCommons):
@@ -40,7 +40,7 @@ class OdooAttribute(OdooCommons):
 
 
 class OdooOrder(OdooCommons):
-    order: PositiveInt
+    order: Optional[PositiveInt]
     odoo_order_status: OrderStatus
     odoo_invoice_status: InvoiceStatus
 

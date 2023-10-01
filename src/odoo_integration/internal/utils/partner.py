@@ -72,7 +72,7 @@ def validate_partners(
     existing_ordercast_users = {
         user.erp_id: {"name": user.name, "id": user.id} for user in ordercast_users
     }
-    unique_names = set()
+    unique_names = set()  # type: ignore
     has_error = False
 
     for user in partners:

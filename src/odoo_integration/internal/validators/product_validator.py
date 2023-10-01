@@ -18,25 +18,25 @@ def validate_products(products: dict[str, Any]) -> None:
     if not products:
         return
 
-    unique_names_dict = {}
+    unique_names_dict = {}  # type: ignore
     has_error = False
     for product in products:
-        if is_empty(product, "id"):
+        if is_empty(product, "id"):  # type: ignore
             logger.error(
-                f"Received group with name '{product['name']}'"
+                f"Received group with name '{product['name']}'"  # type: ignore
                 f"has no remote id. Please correct it in Odoo."
             )
             has_error = True
-        field_with_i18n = get_field_with_i18n_fields(product, "name")
+        field_with_i18n = get_field_with_i18n_fields(product, "name")  # type: ignore
         for field in field_with_i18n:
             unique_names = unique_names_dict.setdefault(field, set())
-            if is_empty(product, field):
+            if is_empty(product, field):  # type: ignore
                 logger.error(
-                    f"Received group with remote id '{product['id']}'"
+                    f"Received group with remote id '{product['id']}'"  # type: ignore
                     f"has no '{field}' field. Please correct it in Odoo."
                 )
                 has_error = True
-            if not is_unique_by(unique_names, product, field):
+            if not is_unique_by(unique_names, product, field):  # type: ignore
                 logger.error(
                     f"Received group with '{field}' = '{product[field]}'"
                     f"should be unique. Please correct it in Odoo."

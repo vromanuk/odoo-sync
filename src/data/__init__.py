@@ -7,7 +7,7 @@ from .enums import (
     Locale,
     OrderStatusForSync,
 )
-from .models import (
+from .models import (  # type:ignore
     OdooUser,
     OdooAddress,
     OdooProductVariant,
@@ -32,6 +32,7 @@ from .ordercast_models import (
     OrdercastOrder,
     OrdercastMerchant,
     OrdercastAttributeValue,
+    OrdercastProductVariant,
 )
 from .typings import OdooEntity
 
@@ -67,4 +68,5 @@ __all__ = (
     "OrdercastMerchant",
     "OrdercastAttributeValue",
     "OdooAttributeValue",
+    "OrdercastProductVariant",
 )

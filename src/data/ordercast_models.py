@@ -194,3 +194,8 @@ class OrdercastOrder(BaseModel):
 
 class OrdercastAttributeValue(OrdercastCommon):
     pass
+
+
+class OrdercastProductVariant(OrdercastCommon):
+    sku: str
+    slug_name: str

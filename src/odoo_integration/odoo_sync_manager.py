@@ -4,7 +4,7 @@ from typing import Any, Annotated, Optional
 import structlog
 from fastapi import Depends
 
-from src.commons import set_context_value
+from src.commons import set_context_value, get_ctx
 from src.odoo_integration.internal.utils.builders import (
     get_partner_data,
     get_attribute_data,
@@ -72,7 +72,7 @@ class OdooSyncManager:
         self.sync_orders_with_odoo(
             from_date=self.repo.get_key(RedisKeys.LAST_SUCCESSFUL_ORDERCAST_SYNC_DATE)
         )
-        logger.info("Start sync orders with Ordercast")
+        logger.info("Start syncing orders with Ordercast")
         self.sync_orders_with_ordercast(
             from_date=self.repo.get_key(RedisKeys.LAST_SUCCESSFUL_ODOO_SYNC_DATE)
         )
@@ -86,7 +86,7 @@ class OdooSyncManager:
     def sync_users_from_odoo_to_ordercast(self) -> None:
         existing_odoo_users = self.repo.get_list(key=RedisKeys.USERS)
         partners = self.odoo_manager.receive_partner_users(
-            exclude_user_ids=[p.odoo_id for p in existing_odoo_users]
+            exclude_user_ids=[p.odoo_id for p in existing_odoo_users]  # type: ignore
         )
         validate_partners(
             partners=partners, ordercast_users=self.ordercast_manager.get_users()
@@ -279,7 +279,13 @@ class OdooSyncManager:
                 product_variants=product_variants_to_sync,
                 units=units,
             )
-            self.odoo_manager.save_product_variants(product_variants_to_sync)
+            self.odoo_manager.save_product_variants(
+                product_variants_to_sync=set_ordercast_id(
+                    items=product_variants_to_sync,
+                    source=self.ordercast_manager.get_product_variants,
+                    key="slug_name",
+                )
+            )
 
     def sync_delivery_methods_and_pickup_locations(self) -> None:
         delivery_options = self.odoo_manager.receive_delivery_options()
@@ -298,19 +304,6 @@ delivery options, start saving them."""
 
             self.ordercast_manager.save_delivery_options(delivery_options_to_sync)
             self.odoo_manager.save_delivery_options(delivery_options_to_sync)
-
-        else:
-            # TODO: enable
-            pass
-            # existing_odoo_delivery_options = self.repo.get_list(
-            #     key=RedisKeys.DELIVERY_OPTIONS
-            # )
-            # existing_ordercast_delivery_options = set()
-            # to_delete = (
-            #     existing_ordercast_delivery_options - existing_odoo_delivery_options
-            # )
-            # self.ordercast_manager.delete_delivery_options(to_delete)
-            # self.repo.remove(to_delete)
 
         pickup_locations = self.odoo_manager.receive_pickup_locations(
             odoo_repo=self.repo
@@ -344,9 +337,18 @@ warehouses, start saving them."""
             odoo_repo=self.repo, order_ids=order_ids, from_date=from_date
         )
         logger.info(f"Loaded {len(orders)} orders, start sending them to Odoo.")
-        self.odoo_manager.sync_orders(orders)
+        _, unique_orders = self.repo.get_diff(
+            compare_to=RedisKeys.ORDERS,
+            comparable=RedisKeys.SYNC_ORDERCAST_ORDERS,
+            entities=[o["_remote_id"] for o in orders],
+        )
+        logger.info(f"Syncing only unique orders => {unique_orders}")
+        self.odoo_manager.sync_orders(
+            [o for o in orders if o["_remote_id"] in unique_orders]
+        )
 
     def sync_orders_with_ordercast(self, from_date: Optional[datetime] = None) -> None:
+        ctx = get_ctx()
         orders = self.odoo_manager.receive_orders(
             from_date=from_date,
             orders_invoice_attach_pending=self.odoo_manager.get_orders_invoice_attach_pending(),
@@ -357,7 +359,7 @@ warehouses, start saving them."""
         if orders:
             self.ordercast_manager.sync_orders(
                 orders=orders,
-                default_price_rate=self.repo.get_key(RedisKeys.DEFAULT_PRICE_RATE),
+                default_price_rate=ctx["commons"]["default_price_rate"],
                 odoo_repo=self.repo,
             )
             self.odoo_manager.save_orders(orders)

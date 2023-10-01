@@ -19,28 +19,28 @@ def validate_categories(categories: dict[str, Any]) -> None:
     if not categories:
         return
 
-    categories = sorted(categories, key=lambda d: d["name"])
+    categories = sorted(categories, key=lambda d: d["name"])  # type: ignore
     has_error = False
-    unique_names_dict = {}
+    unique_names_dict = {}  # type: ignore
 
     for category in categories:
-        if is_empty(category, "id"):
+        if is_empty(category, "id"):  # type: ignore
             logger.error(
-                f"Received category with name '{category['name']}'"
+                f"Received category with name '{category['name']}'"  # type: ignore
                 f"has no remote id. Please correct it in Odoo."
             )
             has_error = True
 
-        field_with_i18n = get_field_with_i18n_fields(category, "name")
+        field_with_i18n = get_field_with_i18n_fields(category, "name")  # type: ignore
         for field in field_with_i18n:
             unique_names = unique_names_dict.setdefault(field, set())
-            if is_empty(category, field):
+            if is_empty(category, field):  # type: ignore
                 logger.error(
-                    f"Received category with remote id '{category['id']}'"
+                    f"Received category with remote id '{category['id']}'"  # type: ignore # noqa
                     f"has no '{field}' field. Please correct it in Odoo."
                 )
                 has_error = True
-            if not is_unique_by(unique_names, category, field):
+            if not is_unique_by(unique_names, category, field):  # type: ignore
                 logger.error(
                     f"Received category with '{field}' = '{category[field]}'"
                     f"should be unique. Please correct it in Odoo."

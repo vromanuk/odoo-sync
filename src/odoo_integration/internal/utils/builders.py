@@ -85,7 +85,7 @@ def get_product_variant_data(
         "names": product_variant["names"],
         "sku": product_variant["code"],
         "attribute_values": [
-            odoo_repo.get(RedisKeys.ATTRIBUTES, a)
+            odoo_repo.get(RedisKeys.ATTRIBUTE_VALUES, a)
             for a in product_variant.get("attribute_values", [])
         ],
     }

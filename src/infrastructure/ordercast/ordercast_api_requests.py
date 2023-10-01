@@ -49,8 +49,8 @@ class Employee(BaseModel):
 
 
 class BulkSignUpRequest(BaseModel):
-    employee: Employee
-    merchant: Merchant
+    send_reset_password_email: bool = False
+    schemas: list[dict[str, Any]]
 
 
 class CreateShippingAddressRequest(BaseModel):
@@ -86,6 +86,10 @@ class ListMerchantsRequest(BasePaginatedRequest):
 
 
 class ListProductsRequest(BasePaginatedRequest):
+    pass
+
+
+class ListProductVariantsRequest(BasePaginatedRequest):
     pass
 
 

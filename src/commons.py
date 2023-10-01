@@ -1,7 +1,7 @@
 import contextvars
 from typing import Any
 
-ctx = contextvars.ContextVar("commons")
+ctx = contextvars.ContextVar("commons")  # type: ignore
 
 
 def get_ctx() -> Any:

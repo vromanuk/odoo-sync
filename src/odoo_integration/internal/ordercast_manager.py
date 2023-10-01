@@ -17,6 +17,7 @@ from src.data import (
     OrdercastOrder,
     OrderStatusForSync,
     OrdercastAttributeValue,
+    OrdercastProductVariant,
 )
 from src.infrastructure import (
     OrdercastApi,
@@ -46,6 +47,7 @@ from src.infrastructure import (
     OrdercastApiValidationException,
     paginated,
     UpsertAttributeValuesRequest,
+    ListProductVariantsRequest,
 )
 from .constants import ORDER_STATUSES_FOR_SYNC
 from .odoo_repo import RedisKeys, OdooRepo
@@ -73,35 +75,37 @@ class OrdercastManager:
         ctx = get_ctx()
         logger.info("Saving users to Ordercast")
         self.ordercast_api.bulk_signup(
-            request=[
-                BulkSignUpRequest(
-                    employee=Employee(
-                        email=user["email"],
-                        first_name=user["name"],
-                        last_name=user["name"],
-                        phone=user["phone"],
-                        password=user["password"],
-                        language=user["language"],
-                    ),
-                    merchant=Merchant(
-                        erp_id=user["erp_id"],
-                        name=user["name"],
-                        phone=user["phone"],
-                        city=user["city"],
-                        sector_id=user.get(
-                            "sector_id", ctx["commons"]["default_sector_id"]
-                        ),
-                        price_rate_id=ctx["commons"]["default_price_rate"]["id"],
-                        postcode=user["postcode"],
-                        street=user["street"],
-                        vat=user["vat"],
-                        website=user["website"],
-                        info=user["info"],
-                        country_alpha_2=user.get("country_alpha_2", "GB"),
-                    ),
-                )
-                for user in users_to_sync
-            ]
+            request=BulkSignUpRequest(
+                schemas=[
+                    {
+                        "employee": Employee(
+                            email=user["email"],
+                            first_name=user["name"],
+                            last_name=user["name"],
+                            phone=user["phone"],
+                            password=user["password"],
+                            language=user["language"],
+                        ).model_dump(),
+                        "merchant": Merchant(
+                            erp_id=user["erp_id"],
+                            name=user["name"],
+                            phone=user["phone"],
+                            city=user["city"],
+                            sector_id=user.get(
+                                "sector_id", ctx["commons"]["default_sector_id"]
+                            ),
+                            price_rate_id=ctx["commons"]["default_price_rate"]["id"],
+                            postcode=user["postcode"],
+                            street=user["street"],
+                            vat=user["vat"],
+                            website=user["website"],
+                            info=user["info"],
+                            country_alpha_2=user.get("country_alpha_2", "GB"),
+                        ).model_dump(),
+                    }
+                    for user in users_to_sync
+                ]
+            )
         )
 
     def create_billing_address(self, user: dict[str, Any]) -> None:
@@ -142,7 +146,6 @@ class OrdercastManager:
                         country=shipping_address["country"],
                         contact_name=shipping_address["name"],
                         contact_phone=shipping_address["phone"],
-                        corporate_status_name=shipping_address["name"],
                     )
                 )
         except OrdercastApiValidationException as e:
@@ -213,6 +216,22 @@ class OrdercastManager:
             for attribute in response.json()
         ]
 
+    def get_product_variants(self) -> list[OrdercastProductVariant]:
+        logger.info("Receiving product variants from Ordercast")
+        product_variants = paginated(
+            self.ordercast_api.get_product_variants,
+            request=ListProductVariantsRequest(),
+        )
+        return [
+            OrdercastProductVariant(
+                id=product_variant["id"],
+                sku=product_variant["sku"],
+                name=product_variant["name"],
+                slug_name=slugify(product_variant["name"]),
+            )
+            for product_variant in product_variants
+        ]
+
     def get_categories(self) -> list[OrdercastCategory]:
         logger.info("Receiving categories from Ordercast")
         response = self.ordercast_api.get_categories()
@@ -240,7 +259,7 @@ class OrdercastManager:
                 for price_rate in result_json
                 if price_rate.get("name") == default_odoo_price_rate
             ),
-            None,
+            None,  # type: ignore
         )
 
     def save_products(self, products_to_sync: list[dict[str, Any]]) -> None:
@@ -327,7 +346,7 @@ class OrdercastManager:
                     ],
                     unit_code=slugify(product_variant["unit"]),
                     attribute_values=[
-                        {"value_id": a.attribute}
+                        {"value_id": a.ordercast_id}
                         for a in product_variant["attribute_values"]
                     ],
                     place_in_warehouse="",
@@ -366,7 +385,7 @@ class OrdercastManager:
                     street=pickup_location["partner"].street,
                     city=pickup_location["partner"].city,
                     postcode=pickup_location["partner"].postcode,
-                    country=pickup_location["partner"].country,
+                    country=pickup_location["partner"].country or "Belgium",
                     contact_name=pickup_location["partner"].contact_name,
                     contact_phone=pickup_location["partner"].contact_phone,
                 )
@@ -436,7 +455,7 @@ class OrdercastManager:
             if ordercast_order.billing_address:
                 order_dto["billing_address"] = ordercast_order.billing_address
             if order.delivery_method:
-                delivery_option = order.delivery_option
+                delivery_option = order.delivery_method
                 delivery_option_dto = {
                     "id": delivery_option.id,
                     "name": delivery_option.name,
@@ -445,7 +464,7 @@ class OrdercastManager:
                     key=RedisKeys.DELIVERY_OPTIONS, entity_id=delivery_option.id
                 )
                 if odoo_delivery_option:
-                    delivery_option_dto["_remote_id"] = odoo_delivery_option.odoo_id
+                    delivery_option_dto["_remote_id"] = odoo_delivery_option.odoo_id  # type: ignore  # noqa
 
                 order_dto["delivery_option"] = delivery_option_dto
             if order.pickup_location:
@@ -455,7 +474,7 @@ class OrdercastManager:
                     key=RedisKeys.PICKUP_LOCATIONS, entity_id=warehouse.id
                 )
                 if odoo_warehouse:
-                    warehouse_dto["_remote_id"] = odoo_warehouse.odoo_id
+                    warehouse_dto["_remote_id"] = odoo_warehouse.odoo_id  # type: ignore
                 else:
                     logger.info(
                         f"The warehouse name '{warehouse.name}' has no remote id."
@@ -486,7 +505,7 @@ class OrdercastManager:
                     order_status_enum=OrderStatusForSync.ordercast_to_odoo_status_map(
                         order["status"]
                     ).value,
-                    merchant_id=odoo_repo.get(
+                    merchant_id=odoo_repo.get(  # type: ignore
                         RedisKeys.USERS, order["partner_id"]
                     ).ordercast_user,
                     price_rate_id=default_price_rate["id"],

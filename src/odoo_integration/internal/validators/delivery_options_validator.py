@@ -19,25 +19,25 @@ def validate_delivery_options(delivery_options: dict[str, Any]) -> None:
     if not delivery_options:
         return
 
-    unique_names_dict = {}
+    unique_names_dict = {}  # type: ignore
     has_error = False
     for delivery_option in delivery_options:
-        if is_empty(delivery_option, "id"):
+        if is_empty(delivery_option, "id"):  # type: ignore
             logger.error(
-                f"Received delivery option with name '{delivery_option['name']}'"
+                f"Received delivery option with name '{delivery_option['name']}'"  # type: ignore # noqa
                 f"has no remote id. Please correct it in Odoo."
             )
             has_error = True
-        field_with_i18n = get_field_with_i18n_fields(delivery_option, "name")
+        field_with_i18n = get_field_with_i18n_fields(delivery_option, "name")  # type: ignore # noqa
         for field in field_with_i18n:
             unique_names = unique_names_dict.setdefault(field, set())
-            if is_empty(delivery_option, field):
+            if is_empty(delivery_option, field):  # type: ignore
                 logger.error(
-                    f"Received delivery option with remote id '{delivery_option['id']}'"
+                    f"Received delivery option with remote id '{delivery_option['id']}'"  # type: ignore # noqa
                     f"has no '{field}' field. Please correct it in Odoo."
                 )
                 has_error = True
-            if not is_unique_by(unique_names, delivery_option, field):
+            if not is_unique_by(unique_names, delivery_option, field):  # type: ignore
                 logger.error(
                     f"Received delivery option with {field} = {delivery_option[field]}"
                     f"should be unique. Please correct it in Odoo."
