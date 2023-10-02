@@ -17,8 +17,8 @@ class RedisClient:
     def get(self, key: str) -> Any:
         return self._client.get(key)
 
-    def set(self, key: str, entity: str) -> None:
-        self._client.set(name=key, value=entity)
+    def set(self, key: str, value: str) -> None:
+        self._client.set(name=key, value=value)
 
     def sscan(self, key: str) -> Iterator[Any]:
         return self._client.sscan_iter(key)

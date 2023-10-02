@@ -220,8 +220,8 @@ class OdooManager:
                         remote_users_obj.write(remote_id, copy_user)
                         create_remote_user = False
                     else:
-                        logger.info(
-                            "No user found in Odoo. Try to create anew in Odoo."
+                        logger.warn(
+                            "No user found in Odoo. Try to create a new in Odoo."
                         )
 
             if create_remote_user:
@@ -925,14 +925,14 @@ class OdooManager:
             )
             return []
 
-        odoo_orders = self.get_remote_updated_objects("sale.order")
-        logger.info(f"Received {len(odoo_orders)} from Odoo. Creating DTOs...")
-        _, unique_orders = self.repo.get_diff(
-            compare_to=RedisKeys.ORDERS,
-            comparable=RedisKeys.SYNC_ORDERCAST_ORDERS,
-            entities=[o["id"] for o in odoo_orders],
-        )
-        orders = [o for o in odoo_orders if o["id"] in unique_orders]
+        orders = self.get_remote_updated_objects("sale.order")
+        logger.info(f"Received {len(orders)} from Odoo. Creating DTOs...")
+        # _, unique_orders = self.repo.get_diff(
+        #     compare_to=RedisKeys.ORDERS,
+        #     comparable=RedisKeys.SYNC_ORDERCAST_ORDERS,
+        #     entities=[o["id"] for o in odoo_orders],
+        # )
+        # orders = [o for o in odoo_orders if o["id"] in unique_orders]
 
         if orders_invoice_attach_pending:
             status_check_orders = self._client.get_odoo_entities(
@@ -1030,20 +1030,18 @@ class OdooManager:
                             order_line["product_id"]
                         )
                         if product_id:
-                            product_variant = self.repo.get(
-                                key=RedisKeys.PRODUCT_VARIANTS, entity_id=product_id
+                            product_group = self.repo.get(
+                                key=RedisKeys.PRODUCTS, entity_id=product_id
                             )
-                            if product_variant:
-                                order_line_dto[
-                                    "product_id"
-                                ] = product_variant.ordercast_id  # type: ignore
+                            if product_group:
+                                order_line_dto["product_id"] = product_group.ordercast_id  # type: ignore  # noqa
                             else:
-                                msg = f"""
+                                raise OdooSyncException(
+                                    f"""
                             Odoo product for remote_id = {product_id} not found.
                             Please sync products first to make this working properly
                                 """
-                                logger.error(msg)
-                                raise OdooSyncException(msg)
+                                )
                             order_line_dto["_remote_product_id"] = product_id
                         else:
                             logger.warn(
@@ -1072,7 +1070,7 @@ class OdooManager:
                     email=user["email"],
                     phone=user["phone"],
                     city=user["city"],
-                    country=user["country"],
+                    country=user.get("country", "England"),
                     postcode=user["postcode"],
                     street=user["street"],
                     ordercast_user=user["ordercast_id"],
@@ -1117,7 +1115,7 @@ class OdooManager:
                 OdooProduct(
                     odoo_id=product["id"],
                     name=product["name"],
-                    product=product["ordercast_id"],
+                    ordercast_id=product["ordercast_id"],
                 )
                 for product in products_to_sync
             ],

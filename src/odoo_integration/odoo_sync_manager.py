@@ -5,14 +5,6 @@ import structlog
 from fastapi import Depends
 
 from src.commons import set_context_value, get_ctx
-from src.odoo_integration.internal.utils.builders import (
-    get_partner_data,
-    get_attribute_data,
-    get_product_data,
-    get_product_variant_data,
-    get_delivery_option_data,
-    get_pickup_location_data,
-)
 from .internal.odoo_manager import OdooManager, get_odoo_provider
 from .internal.odoo_repo import OdooRepo, get_odoo_repo, RedisKeys
 from .internal.ordercast_manager import OrdercastManager, get_ordercast_manager
@@ -21,6 +13,14 @@ from .internal.utils import (
     set_ordercast_id,
     set_user_ordercast_id,
     validate_partners,
+)
+from .internal.utils.builders import (
+    get_partner_data,
+    get_attribute_data,
+    get_product_data,
+    get_product_variant_data,
+    get_delivery_option_data,
+    get_pickup_location_data,
 )
 from .internal.utils.helpers import set_attribute_value_ordercast_id
 from .internal.validators import (
@@ -359,20 +359,26 @@ warehouses, start saving them."""
         if orders:
             self.ordercast_manager.sync_orders(
                 orders=orders,
-                default_price_rate=ctx["commons"]["default_price_rate"],
+                default_price_rate_id=ctx["commons"]["default_price_rate_id"],
                 odoo_repo=self.repo,
             )
             self.odoo_manager.save_orders(orders)
 
     def load_commons(self) -> None:
         default_sector_id = self.ordercast_manager.get_sector()
-        default_price_rate = self.ordercast_manager.get_default_price_rate()
+        default_price_rate_id = self.repo.get_key(RedisKeys.DEFAULT_PRICE_RATE_ID)
+        if not default_price_rate_id:
+            default_price_rate = self.ordercast_manager.get_default_price_rate()
+            default_price_rate_id = default_price_rate["id"]
+            self.repo.set(
+                key=RedisKeys.DEFAULT_PRICE_RATE_ID, value=default_price_rate_id
+            )
 
         set_context_value(
             value={
                 "commons": {
                     "default_sector_id": default_sector_id,
-                    "default_price_rate": default_price_rate,
+                    "default_price_rate_id": default_price_rate_id,
                 }
             }
         )

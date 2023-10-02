@@ -42,6 +42,8 @@ class RedisKeys(str, enum.Enum):
     LAST_PRODUCT_SYNC = "last_product_sync"
     LAST_PRODUCT_VARIANT_SYNC = "last_pv_sync"
 
+    DEFAULT_PRICE_RATE_ID = "price-rate"
+
 
 class OdooRepo:
     def __init__(self, client: RedisClient, prefix: str):
@@ -126,8 +128,8 @@ class OdooRepo:
             entity_key=f"{entity_key}:{entity.odoo_id}",  # type: ignore
         )
 
-    def set(self, key: RedisKeys, entity: OdooEntity) -> None:
-        self._client.set(key=f"{self._prefix}:{key}", entity=entity.json())
+    def set(self, key: RedisKeys, value: str) -> None:
+        self._client.set(key=f"{self._prefix}:{key}", value=value)
 
     def remove(self, key: RedisKeys, entity_id: int) -> None:
         entity_schema = self._schema[key]

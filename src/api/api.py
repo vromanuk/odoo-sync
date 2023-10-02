@@ -1,7 +1,7 @@
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.requests import Request
 
 from src.infrastructure import RedisClient, get_redis_client
@@ -36,8 +36,10 @@ async def health(
     response_model=Response,
 )
 async def sync(
-    odoo_sync_manager: Annotated[OdooSyncManager, Depends(get_odoo_sync_manager)]
+    background_tasks: BackgroundTasks,
+    odoo_sync_manager: Annotated[OdooSyncManager, Depends(get_odoo_sync_manager)],
 ) -> Response:
+    # background_tasks.add_task(odoo_sync_manager.sync)
     odoo_sync_manager.sync()
     return Response(message="Started full sync")
 

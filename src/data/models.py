@@ -20,7 +20,7 @@ class OdooCommons(BaseModel):
 
 class OdooProduct(OdooCommons):
     name: str
-    product: Optional[PositiveInt] = None
+    ordercast_id: PositiveInt
 
 
 class OdooCategory(OdooCommons):

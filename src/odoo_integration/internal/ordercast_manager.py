@@ -94,7 +94,7 @@ class OrdercastManager:
                             sector_id=user.get(
                                 "sector_id", ctx["commons"]["default_sector_id"]
                             ),
-                            price_rate_id=ctx["commons"]["default_price_rate"]["id"],
+                            price_rate_id=ctx["commons"]["default_price_rate_id"],
                             postcode=user["postcode"],
                             street=user["street"],
                             vat=user["vat"],
@@ -244,7 +244,7 @@ class OrdercastManager:
 
     def get_default_price_rate(self) -> dict[str, Any]:
         logger.info("Creating a Default Odoo price rate")
-        default_odoo_price_rate = "Default Odoo Price Rate"
+        default_odoo_price_rate = "Default Odoo Price Rate 0"
         self.ordercast_api.upsert_price_rate(
             request=[UpsertPriceRatesRequest(name=default_odoo_price_rate)]
         )
@@ -340,7 +340,7 @@ class OrdercastManager:
                     price_rates=[
                         PriceRate(
                             price=product_variant["price"],
-                            price_rate_id=ctx["commons"]["default_price_rate"]["id"],
+                            price_rate_id=ctx["commons"]["default_price_rate_id"],
                             quantity=1,
                         )
                     ],
@@ -385,7 +385,7 @@ class OrdercastManager:
                     street=pickup_location["partner"].street,
                     city=pickup_location["partner"].city,
                     postcode=pickup_location["partner"].postcode,
-                    country=pickup_location["partner"].country or "Belgium",
+                    country=pickup_location["partner"].country,
                     contact_name=pickup_location["partner"].contact_name,
                     contact_phone=pickup_location["partner"].contact_phone,
                 )
@@ -496,24 +496,30 @@ class OrdercastManager:
     def sync_orders(
         self,
         orders: list[dict[str, Any]],
-        default_price_rate: dict[str, Any],
+        default_price_rate_id: int,
         odoo_repo: OdooRepo,
     ) -> None:
         for order in orders:
+            odoo_user = odoo_repo.get(RedisKeys.USERS, order["partner_id"])
+            if not odoo_user:
+                logger.warn(f"Skipping order {order['id']} because odoo user not found")
+                continue
+
+            logger.info(f"Syncing order `{order['id']}` with Ordercast")
             ordercast_order_id = self.ordercast_api.create_order(
                 request=CreateOrderRequest(
                     order_status_enum=OrderStatusForSync.ordercast_to_odoo_status_map(
                         order["status"]
                     ).value,
-                    merchant_id=odoo_repo.get(  # type: ignore
-                        RedisKeys.USERS, order["partner_id"]
-                    ).ordercast_user,
-                    price_rate_id=default_price_rate["id"],
+                    merchant_id=odoo_user.ordercast_user,  # type: ignore
+                    price_rate_id=default_price_rate_id,
                     external_id=order["id"],
                 )
             )
 
             if file_content := order.get("invoice_file_data"):
+                logger.info(f"Found invoice for {order['id']}. Attaching invoice...")
+
                 response = self.ordercast_api.get_order(ordercast_order_id)
                 ordercast_order_internal_id = response.json()["internal_id"]
                 self.ordercast_api.attach_invoice(
